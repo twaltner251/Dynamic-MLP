@@ -55,7 +55,7 @@ class MLP:
         model_array = []
         prev_idx = 0    
         cur_idx = 0
-        for i in range(1, len(layers)):
+        for i in range(1, len(layers)): # construct model_array and populate self.indices dictionary
             layer_name = f"layer_{i}"
 
             prev_layer = self.layers[i-1]
@@ -65,34 +65,52 @@ class MLP:
             num_biases = cur_layer
 
             # initialize random weights & biases for layer
-            model_array.append(np.random.rand(num_weights + num_biases))
-
+            model_array.append(np.random.randn(num_weights))
+            model_array.append(np.zeros(num_biases))
+            
+            w_end_idx = prev_idx + num_weights - 1
             cur_idx = prev_idx + num_weights + num_biases - 1
 
             # update indices dict
-            self.indices[layer_name] = (prev_idx, cur_idx)
+            self.indices[f"{layer_name}_weights"] = (prev_idx, w_end_idx)
+            self.indices[f"{layer_name}_biases"] = (w_end_idx + 1, cur_idx)
+
+            # update prev_idx
             prev_idx = cur_idx + 1
 
         self.model_array = np.concatenate(model_array)
 
-        print(self.indices)
-        print()
-        print(self.model_array)
-
-    def forward(self, prev_a):
-        # z = value before activation
+    def forward(self, activations: list[float], idx: int):
+        # z = pre-activation value
         # a = activation
         # z = w * prev_a + b
         # cur_a = actv(z)
 
-        for i in range(1, self.indices["num_layers"] + 1):
-            layer_idx = self.indices[f"layer_{i}"]
-            print(f"layer_{i}")
-            for k in range(layer_idx[0], layer_idx[1] + 1):
-                print(k)
+        # extract indexes
+        w_start, w_end = self.indices[f"layer_{idx}_weights"]
+        b_start, b_end = self.indices[f"layer_{idx}_biases"]
 
+        # extract weights & biases from main array
+        w_1d = self.model_array[w_start:w_end + 1]
+        b_1d = self.model_array[b_start:b_end + 1]
 
-        return
+        # reshape weights into 2d array for matrix mult
+        w_2d = w_1d.reshape(self.layers[idx], len(activations))
+        
+        # calulate pre-activation func
+        z = np.dot(w_2d, activations) + b_1d
+        
+        # pass z thru activation func
+        cur_a = self.actv_func(z)
+
+        # recursion portion, if layer is NOT last layer: go deeper, else: return current activation
+        if idx != self.indices["num_layers"]:
+            print("Pass: " + str(idx) + "complete")
+            return self.forward(cur_a, idx + 1)
+
+        else:
+            print("ending recursion")
+            return cur_a
 
     def backward(self):
         pass
@@ -120,18 +138,21 @@ def take_input(): # handle commandline input, organize information of model
 
 def main():
     data_path, hidden_layers, num_classes, actv_func, epochs, learn_rate = take_input()
-    data_path, hidden_layers, num_classes, actv_func, learn_rate
 
     # load data
     X_train, y_train = mnist_reader.load_mnist(data_path, kind='train')
     X_test, y_test = mnist_reader.load_mnist(data_path, kind='t10k')
-    input_size = len(X_train[0])
+    # input_size = len(X_train[0])
+    input_size = 2
+    # CHANGE ^^^
+    
+    layers = [input_size] + hidden_layers + [num_classes]
 
-    layers = [10] + hidden_layers + [num_classes]
+    print(layers)
 
     model = MLP(layers, actv_func)
 
-    model.forward(X_train[0])
+    print(model.forward([1,2], 1))
 
 
 main()
