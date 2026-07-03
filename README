@@ -1,1 +1,15 @@
+Forward pass: implemented with recursion to go thru deeper each layer, and for loop for iterating thru each individual node in layer
+
+Prev Changes: 
+- changed activation func method to return tuple of activation func and associated deivative 
+
+Cur Changes:
+- added loss func parameter to command line and implemented loss_func() to return 3 diff loss functions, MSE, BCE, & Focal loss
+
+TODO: 
+- implement bce * focal loss funcs & derivs
+- backwards method complete dynamically
+
+loss func reading: https://www.linkedin.com/pulse/activation-functions-loss-learning-curves-visual-guide-amit-kharche-7zkgf
+
 

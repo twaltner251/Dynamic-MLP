@@ -22,34 +22,78 @@ Labels Array:
 9	Ankle boot
 '''
 
-def activation_func(func: str):
+# returns tuple of activation func as well as its derivative to be passed into MLP
+def activation_func(func: str) -> tuple: 
     f = func.lower() # normalize str by making lowercase
 
     if f == 'sig' or f == 'sigmoid':
         def sigmoid(value: float):
             return 1 / (1 + math.pow(math.e, -value))
-        return sigmoid
+        def deriv_sigmoid(previous_sigmoid: float): 
+            # forward pass calculated our sigmoid values, so when we input we can use it to calculate derivative of sig(x) which = (1 - sig(x)) * sig(x)
+            return (1 - previous_sigmoid) * previous_sigmoid
+        return sigmoid, deriv_sigmoid
     
     elif f == 'relu':
         def relu(value: float):
+            return 0 if value <= 0 else value
+        def deriv_relu(value: float):
             return 0 if value <= 0 else 1
-        return relu
+        return relu, deriv_relu
     
     elif f == 'tanh':
         def tanh(value: float):
             return np.tanh(value)
-        return tanh
+        def deriv_tanh(previous_tanh: float):
+            return 1 - math.pow(previous_tanh, 2)
+        return tanh, deriv_tanh
     
     else:
-        print('invalid input for activation func, please input either one of the following in the commandline arguments:\nactivation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, tanh for Tanh)')
+        print("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, tanh for Tanh)")
         sys.exit()
 
+def loss_func(func: str) -> tuple:
+    # y = actual, y_hat = predicted
+    if func == "mse":
+        # wrap outputs in float to convert from np.float64 -> float
+        def mean_sq_err(y: list[float], y_hat: list[float]):
+            return float(np.mean((y_hat - y) ** 2))
+        def deriv_mean_sq_err(y: list[float], y_hat: list[float]):
+            return (2 / len(y)) * (y_hat - y)
+        return mean_sq_err, deriv_mean_sq_err
+    
+    elif func == "mae":
+        def mean_abs_err(y: list[float], y_hat: list[float]):
+            return float(np.mean(np.abs(y - y_hat)))
+        def deriv_mean_abs_err(y: list[float], y_hat: list[float]):
+            return np.sign(y - y_hat) / len(y)
+        return mean_abs_err, deriv_mean_abs_err
+        
+    elif func == "bce":
+        def binary_cross_entropy(y: list[float], y_hat: list[float]):
+            return 
+        def deriv_binary_cross_entropy(y: list[float], y_hat: list[float]):
+            return
+        return binary_cross_entropy, deriv_binary_cross_entropy
+    
+    elif func == "fl":
+        def focal_loss(y: list[float], y_hat: list[float]):
+            return
+        def deriv_focal_loss(y: list[float], y_hat: list[float]):
+            return
+        return focal_loss, deriv_focal_loss
+    
+    else:
+        print("invalid input for loss func, please input either one of the following in the command line args for loss:\nmse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss")
+        sys.exit()
 
 class MLP:
-    def __init__(self, layers, actv_func):
-        # weights and biases in 1D array, length of portions specified by input list input with our weights one row at a time product randomly generated based off of hidden layer dimensions, activation func assigned by activ func method
+    def __init__(self, layers, funcs, loss):
+        # weights and biases in 1D array, length of portions specified by input list input with our weights one row at a time product 
+        # randomly generated based off of hidden layer dimensions, activation/loss funcs assigned by activ/loss func methods
         self.layers = layers
-        self.actv_func = actv_func
+        self.actv_func, self.deriv_actv_func = funcs
+        self.loss_func, self.deriv_loss_func = loss
         self.indices = {"num_layers": len(layers) - 1} # index dictionary to track indices of weights & biases of each layer
 
         model_array = []
@@ -117,27 +161,28 @@ class MLP:
     
 
 def take_input(): # handle commandline input, organize information of model
-    if len(sys.argv) < 6:
-        print('Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig 100 0.1\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, tanh for Tanh)\nepochs: 100\nlearning rate: 0.1')
+    if len(sys.argv) < 7:
+        print('Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig mse 100 0.1\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1')
         return
 
     data_path = sys.argv[1]
     hidden_layers = []
-    num_hidden_layers = len(sys.argv) - 4
+    num_hidden_layers = len(sys.argv) - 5
     
     for layer in range(2,num_hidden_layers):
         hidden_layers.append(int(sys.argv[layer]))
 
     num_classes = int(sys.argv[num_hidden_layers])
-    actv_func = activation_func(sys.argv[num_hidden_layers + 1]) # pass thru activation_func() to output correct actv_func 
-    epochs = int(sys.argv[num_hidden_layers + 2])
-    learn_rate = float(sys.argv[num_hidden_layers + 3])
+    actv_funcs = activation_func(sys.argv[num_hidden_layers + 1].lower()) # pass thru activation_func() to output correct actv_func 
+    loss = loss_func(sys.argv[num_hidden_layers + 2].lower())
+    epochs = int(sys.argv[num_hidden_layers + 3])
+    learn_rate = float(sys.argv[num_hidden_layers + 4])
 
-    return data_path, hidden_layers, num_classes, actv_func, epochs, learn_rate
+    return data_path, hidden_layers, num_classes, actv_funcs, loss, epochs, learn_rate
 
 
 def main():
-    data_path, hidden_layers, num_classes, actv_func, epochs, learn_rate = take_input()
+    data_path, hidden_layers, num_classes, actv_funcs, loss, epochs, learn_rate = take_input()
 
     # load data
     X_train, y_train = mnist_reader.load_mnist(data_path, kind='train')
@@ -148,9 +193,7 @@ def main():
     
     layers = [input_size] + hidden_layers + [num_classes]
 
-    print(layers)
-
-    model = MLP(layers, actv_func)
+    model = MLP(layers, actv_funcs, loss)
 
     print(model.forward([1,2], 1))
 
