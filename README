@@ -1,15 +1,48 @@
+Author: Tyler Waltner
+Email: waltnertyler@gmail.com
+Date: Jul 5th, 2026
+
+Features:
+Dynamic Command-Line Args to specify model 
+Model weights and biases stored in 1D array
 Forward pass: implemented with recursion to go thru deeper each layer, and for loop for iterating thru each individual node in layer
+Backward pass: implmented with recursion to propagate thru layers until reach very first hidden layer
 
 Prev Changes: 
-- changed activation func method to return tuple of activation func and associated deivative 
+- added loss func parameter to command line and implemented loss_func() to return 3 diff loss functions, MSE, MAE
 
 Cur Changes:
 - added loss func parameter to command line and implemented loss_func() to return 3 diff loss functions, MSE, MAE, BCE, & Focal loss
+- Working on implementing recursive backwards pass
+    * updated forward pass to save activations in list self.model_activations (np array) to be used in backwards pass calculation
+    * updated self.indices to include indices for self.model_activations
+    * created new instance variable, self.model_activations_idx to track which activation we are on throughout forward pass
+- Adjusted print statements of forward pass to match backwards pass
+- Deleted redundant variable for creating key values of self.indices
+- Fixed bug with num_layers where I wasn't counting the output layer at self.indices["num_layers"]'s initialization so output layer's
+weights and biases weren't generated. Pretty easy fix, but integral to model function as previously my output layer activations weren't
+being calculated!
+
+Challenges:
+- had to make sure to first create an np.zeros array that is the size for all hidden layers combined for self.model_activations in 
+order to modify arrays in-place. Initially when I implemented self.model_activations, I created an empty array and planned to append
+each activation layer individually to self.model_activations. HOWEVER, np arrays have immutable allocation of memory, so np.append 
+returns a different array than the original one. So for the sake of memory optimization, rather than appending to it, allocated 
+memory via creating np.zeros array of final array size, and created self.model_activations_idx variable to track idx when appending
+to self.model_array during forward pass.
+
 
 TODO: 
-- implement bce * focal loss funcs & derivs
+High Prio:
 - backwards method complete dynamically
+- create training loop to pass data in batches
+- create method for model to save weights and biases in txt file to not lose progress
+- implement performance method to track F1 & loss over time
 
-loss func reading: https://www.linkedin.com/pulse/activation-functions-loss-learning-curves-visual-guide-amit-kharche-7zkgf
+Low Prio: 
+- implement bce & focal loss funcs & derivs
+- delete print stmts for forward & backward pass? only need prints for epochs, etc?
 
-
+AI Use:
+AI was used STRICTLY only for undestanding concepts and minor bug fixing. It was mainly consulted for the architecture of how I should implement my MLP in an 1D
+setting as well as to help me wrap my head around the conceptual side of ML. i.e. Hidden Layer Architecture, the calculus of the Forward/Backward Pass, test v.s. training sets, performance measuring utilizing F1 & loss, etc.
