@@ -70,7 +70,7 @@ High Prio:
 - create training loop to pass data in batches
 - create method for model to save weights and biases in txt file to not lose progress
 - implement performance method to track F1 & loss over time
-
+ 
 Low Prio: 
 - implement bce & focal loss funcs & derivs
 - delete print stmts for forward & backward pass? only need prints for epochs, etc?
