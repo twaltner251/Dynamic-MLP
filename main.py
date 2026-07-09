@@ -23,37 +23,37 @@ Labels Array:
 '''
 
 # returns tuple of activation func as well as its derivative to be passed into MLP
-def activation_func(func: str) -> tuple: 
+def activation_func(func: str): # last bool in output tuple represents whether caching is needed or not in Forward pass
     f = func.lower() # normalize str by making lowercase
 
     if f == 'sig' or f == 'sigmoid':
-        def sigmoid(value: float):
-            return 1 / (1 + math.pow(math.e, -value))
-        def deriv_sigmoid(previous_sigmoid: float): 
+        def sigmoid(vector):
+            return 1 / (1 + np.exp(-vector))
+        def deriv_sigmoid(previous_sigmoid): 
             # forward pass calculated our sigmoid values, so when we input we can use it to calculate derivative of sig(x) which = (1 - sig(x)) * sig(x)
             return (1 - previous_sigmoid) * previous_sigmoid
-        return sigmoid, deriv_sigmoid
+        return sigmoid, deriv_sigmoid, False
     
     elif f == 'relu':
-        def relu(value: float):
-            return 0 if value <= 0 else value
-        def deriv_relu(value: float):
-            return 0 if value <= 0 else 1
-        return relu, deriv_relu
+        def relu(vector):
+            return np.maximum(0, vector)
+        def deriv_relu(vector):
+            return np.clip(vector, 0, 1) 
+        return relu, deriv_relu, True # relu need to cache due to destroying gradients when value is < 0
     
     elif f == 'tanh':
-        def tanh(value: float):
-            return np.tanh(value)
-        def deriv_tanh(previous_tanh: float):
-            return 1 - math.pow(previous_tanh, 2)
-        return tanh, deriv_tanh
+        def tanh(vector):
+            return np.tanh(vector)
+        def deriv_tanh(previous_tanh):
+            return 1 - np.exp(previous_tanh, 2)
+        return tanh, deriv_tanh, False
     
     else:
         print("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, tanh for Tanh)")
         sys.exit()
 
 
-def loss_func(func: str) -> tuple:
+def loss_func(func: str):
     # y = actual, y_hat = predicted
     if func == "mse":
         # wrap outputs in float to convert from np.float64 -> float
@@ -90,25 +90,40 @@ def loss_func(func: str) -> tuple:
 
 
 class MLP:
-    def __init__(self, layers, funcs, loss):
+    def __init__(self, layers, actv_funcs, loss):
         # weights and biases in 1D array, length of portions specified by input list input with our weights one row at a time product 
         # randomly generated based off of hidden layer dimensions, activation/loss funcs assigned by activ/loss func methods
         self.layers = layers
-        self.actv_func, self.deriv_actv_func = funcs
+        self.actv_func, self.deriv_actv_func, self.cache = actv_funcs
         self.loss_func, self.deriv_loss_func = loss
         
         # index dictionary to track indices of weights & biases of each layer
         self.indices = {"num_layers": len(layers) - 1} # (num_layers inclusive of output layer)
 
-        # array to store forward pass activations
-        self.model_activations = np.zeros(sum(self.layers[1:]))
+        # IF we are caching z values:
+        if self.cache: 
+            # cached_z does not need to store first layer (activations)
+            self.cached_z = np.zeros(sum(self.layers[1:])) 
+
+            # counter for tracking which z's haven't been cached yet
+            self.cached_z_idx = 0
+
+            # add indices of cached_z of each layer to self.indices (z values added later in forward pass)
+            prev_idx = 0
+            for i in range(1, self.indices["num_layers"] + 1):
+                cur_idx = prev_idx + self.layers[i] - 1
+                self.indices[f"layer_{i}_z"] = (prev_idx, cur_idx)
+                prev_idx = cur_idx + 1
+
+        # initialize array to store forward pass activations
+        self.model_activations = np.zeros(sum(self.layers))
         
         # counter for tracking which activations haven't been populated inside of model_activations (utilized in forward pass)
         self.model_activations_idx = 0
 
         # add indices of model_activations of each layer to self.indices (activation values added later in forward pass)
         prev_idx = 0
-        for i in range(1, self.indices["num_layers"] + 1):
+        for i in range(0, self.indices["num_layers"] + 1):
             cur_idx = prev_idx + self.layers[i] - 1
             self.indices[f"layer_{i}_activations"] = (prev_idx, cur_idx)
             prev_idx = cur_idx + 1 # update prev_idx
@@ -143,6 +158,11 @@ class MLP:
 
 
     def forward(self, activations: list[float], idx: int):
+        if idx == 1: # if we are on first forward pass, add in input layer's activations
+            for a in activations:
+                self.model_activations[self.model_activations_idx] = a
+                self.model_activations_idx += 1 # increment idx tracking
+
         # z = pre-activation value
         # a = activation
         # z = w * prev_a + b
@@ -160,10 +180,15 @@ class MLP:
         w_2d = w_1d.reshape(self.layers[idx], len(activations))
         
         # calulate pre-activation func
-        z = np.dot(w_2d, activations) + b_1d
-        
+        cur_z = np.dot(w_2d, activations) + b_1d
+
+        # IF caching z value:
+        if self.cache:
+            self.cached_z[self.cached_z_idx: self.cached_z_idx + len(cur_z)] = cur_z 
+            self.cached_z_idx += len(cur_z) # increment idx tracking
+    
         # pass z thru activation func
-        cur_a = self.actv_func(z)
+        cur_a = self.actv_func(cur_z)
 
         # append each activation in cur_a (current activations) to self.model_activations
         for a in cur_a:
@@ -180,37 +205,85 @@ class MLP:
             print("ending recursion")
         
 
-    def backward(self, y, y_hat, learning_rate: float, idx: int):
+    def backward(self, y, learning_rate: float, idx: int):
         # Backprop through layers
         # Chain Rule: 
         # F'(g(x)) = F'(g(x)) * g'(x)
         # z = w * a + b
- 
         cur_layer = self.indices["num_layers"] + 1 - idx
-        cur_layer_activations = self.indices[f"layer_{cur_layer - 1}_activations"] 
-        prev_layer_activations = self.indices[f"layer_{cur_layer - 1}_activations"] 
 
+        # extract tuples of indices for activations of current/prev layers, weights, and biases
+        cur_a_beg, cur_a_end = self.indices[f"layer_{cur_layer}_activations"] 
+        prev_a_beg, prev_a_end = self.indices[f"layer_{cur_layer - 1}_activations"] 
+        w_beg, w_end = self.indices[f"layer_{cur_layer}_weights"]
+        b_beg, b_end = self.indices[f"layer_{cur_layer}_biases"]
+
+        # extract activations of current and prev layers from self.model_activations array and extract current weights/biases from self.model_array
+        cur_a = self.model_activations[cur_a_beg: cur_a_end + 1] # +1 at end because list indexing is NOT inclusive of 2nd index
+        prev_a = self.model_activations[prev_a_beg: prev_a_end + 1] # ^^^
+        cur_w = self.model_array[w_beg: w_end + 1]                      # ^^^
+        cur_b = self.model_array[b_beg: b_end]                          # ^^^
+
+        dC_da = None
+        if idx == 1:
+            dC_da = self.deriv_loss_func(y, cur_a)
+        else: 
+            dC_da = y
+
+        print("y:", np.shape(y))
+
+        print("dC_da:", np.shape(dC_da))
+
+        da_dz = None
+        if self.cache:
+            cur_z_beg, cur_z_end = self.indices[f"layer_{cur_layer}_z"]
+            cur_z = self.cached_z[cur_z_beg: cur_z_end + 1] # +1 at end because list indexing is NOT inclusive of 2nd index
+            da_dz = self.deriv_actv_func(cur_z)
+        else:
+            da_dz = self.deriv_actv_func(cur_a)
+        
+        print("da_dz:", np.shape(da_dz))
+
+        # can use dC/db to calculate dC_dw since:
+        # Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
+        # dC/db = C'(a(z(w))) * a'(z(w)) * 1
+        # dC/db = C'(a(z(w))) * a'(z(w))
         # Change of Cost to Weights: C = cost (aka loss), a = activ, z = value before activation w = weight 
         # dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
         # dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
-        dC_da = self.deriv_loss_func(y, y_hat)
-        da_dz = self.deriv_actv_func(y, y_hat)
-        a_prev = None
+        # dC/dw = dC/db * a(prev)
+        dC_db = np.dot(dC_da, da_dz)    
+        
+        print("dC/db = C'(a(z(w))) * a'(z(w)) * 1:", np.shape(dC_db))
+        
+        dC_dw = np.dot(dC_db, prev_a)
 
-        # Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
-        # dC/db = C'(a(z(w))) * a'(z(w)) * z'(b)
-        # dC/db = C'(a(z(w))) * a'(z(w)) * 1
-        # dC/db = C'(a(z(w))) + a'(z(w))
+        print("dC/dw = dC/db * a(prev):", np.shape(dC_dw))
+    
+        # adjust weights / biases SUBTRACT= because want to DESCEND the gradient to minimize solution
+        cur_w -= dC_dw * learning_rate
+
+        print("cur_w:", np.shape(cur_w))
+
+        cur_b -= dC_db * learning_rate
+
+        print("cur_b:", np.shape(cur_b))
+
+        # backwards funciton needs to know which direction to decend, so we pass in dC/da(prev) to tell it
+        # dC/da(prev) = dC/da * da/dz * dz/da(prev)
+        #                               dz/da(prev) <= weights of cur layer (z = w * a + b)
+        # dC/da(prev) = dC/da * da/dz * w(cur)
+        # dC/da(prev) = dC/db * w(cur)
+        dC_da_prev = np.dot(dC_db, cur_w)
+
+        print("dC_da_prev:", np.shape(dC_da_prev))
 
         # if not last layer, go deeper one more layer (else, is last layer and can end recursion)
-        if idx == self.indices("num_layers"): 
+        if idx != self.indices["num_layers"]: 
             print(f"Backward Pass of layer {idx} complete")
 
-            #
-            #
-            #
             # TODO CHANGE INPUTS FOR RECURSIVE STEP
-            return self.backward(None, None, learning_rate, idx + 1)
+            return self.backward(dC_da_prev, learning_rate, idx + 1)
         
         else:
             print(f"Backward Pass of layer {idx} complete")
@@ -239,6 +312,7 @@ def take_input(): # handle commandline input, organize information of model
 
 
 def main():
+    # handle command line args
     data_path, hidden_layers, num_classes, actv_funcs, loss, epochs, learn_rate = take_input()
 
     # load data
@@ -249,9 +323,18 @@ def main():
     
     layers = [input_size] + hidden_layers + [num_classes]
 
-    model = MLP(layers, actv_funcs, loss)
+    # change back to layers
+    #
+    #
+    model = MLP([3,2,1], actv_funcs, loss)
 
-    model.forward(X_train[0], 1)
+    # change to first input
+    #
+    #
+    model.forward([0, 0, 1], 1)
+    
+    y = [1]
+    model.backward([1], learn_rate, 1)
 
 
 main()
