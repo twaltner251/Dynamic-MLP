@@ -221,8 +221,8 @@ class MLP:
         # extract activations of current and prev layers from self.model_activations array and extract current weights/biases from self.model_array
         cur_a = self.model_activations[cur_a_beg: cur_a_end + 1] # +1 at end because list indexing is NOT inclusive of 2nd index
         prev_a = self.model_activations[prev_a_beg: prev_a_end + 1] # ^^^
-        cur_w = self.model_array[w_beg: w_end + 1]                      # ^^^
-        cur_b = self.model_array[b_beg: b_end]                          # ^^^
+        cur_w = self.model_array[w_beg: w_end + 1]                  # ^^^
+        cur_b = self.model_array[b_beg: b_end + 1]                  # ^^^
 
         dC_da = None
         if idx == 1:
@@ -230,10 +230,7 @@ class MLP:
         else: 
             dC_da = y
 
-        print("y:", np.shape(y))
-
-        print("dC_da:", np.shape(dC_da))
-
+        # assign da/dz based off of if we cached or not
         da_dz = None
         if self.cache:
             cur_z_beg, cur_z_end = self.indices[f"layer_{cur_layer}_z"]
@@ -241,8 +238,6 @@ class MLP:
             da_dz = self.deriv_actv_func(cur_z)
         else:
             da_dz = self.deriv_actv_func(cur_a)
-        
-        print("da_dz:", np.shape(da_dz))
 
         # can use dC/db to calculate dC_dw since:
         # Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
@@ -252,31 +247,25 @@ class MLP:
         # dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
         # dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
         # dC/dw = dC/db * a(prev)
-        dC_db = np.dot(dC_da, da_dz)    
         
-        print("dC/db = C'(a(z(w))) * a'(z(w)) * 1:", np.shape(dC_db))
+        # calculate dC/db, use .flatten() to ensure element-wise mult
+        dC_db = dC_da.flatten() * da_dz.flatten()
         
-        dC_dw = np.dot(dC_db, prev_a)
-
-        print("dC/dw = dC/db * a(prev):", np.shape(dC_dw))
-    
-        # adjust weights / biases SUBTRACT= because want to DESCEND the gradient to minimize solution
-        cur_w -= dC_dw * learning_rate
-
-        print("cur_w:", np.shape(cur_w))
-
-        cur_b -= dC_db * learning_rate
-
-        print("cur_b:", np.shape(cur_b))
+        # use np.outer to use outer product generate 2d matrix from 1D vectors
+        dC_dw_2d = np.outer(dC_db, prev_a)
+        dC_dw = dC_dw_2d.flatten() # flatten back to 1d array
 
         # backwards funciton needs to know which direction to decend, so we pass in dC/da(prev) to tell it
         # dC/da(prev) = dC/da * da/dz * dz/da(prev)
         #                               dz/da(prev) <= weights of cur layer (z = w * a + b)
         # dC/da(prev) = dC/da * da/dz * w(cur)
         # dC/da(prev) = dC/db * w(cur)
-        dC_da_prev = np.dot(dC_db, cur_w)
+        # reshape weights to 2d matrix of dimensions (neurons current layer, neurons previous layer)
+        dC_da_prev = np.dot(dC_db, cur_w.reshape(len(cur_a), len(prev_a)))
 
-        print("dC_da_prev:", np.shape(dC_da_prev))
+        # adjust weights / biases SUBTRACT= because want to DESCEND the gradient to minimize solution
+        cur_w -= dC_dw * learning_rate
+        cur_b -= dC_db * learning_rate
 
         # if not last layer, go deeper one more layer (else, is last layer and can end recursion)
         if idx != self.indices["num_layers"]: 
@@ -323,18 +312,12 @@ def main():
     
     layers = [input_size] + hidden_layers + [num_classes]
 
-    # change back to layers
-    #
-    #
-    model = MLP([3,2,1], actv_funcs, loss)
+    model = MLP(layers, actv_funcs, loss)
 
-    # change to first input
-    #
-    #
-    model.forward([0, 0, 1], 1)
+    model.forward(X_train[0], 1)
     
-    y = [1]
-    model.backward([1], learn_rate, 1)
+    # place holder backwards pass input
+    model.backward([0,1,2,3,4,5,6,7,8,9], learn_rate, 1)
 
 
 main()

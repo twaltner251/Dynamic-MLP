@@ -2,7 +2,7 @@ Author: Tyler Waltner
 Email: waltnertyler@gmail.com
 Date: Jul 5th, 2026
 
-Features:
+### Features:
 Dynamic Command-Line Args to specify model 
 Model weights and biases stored in 1D array
 activation func method: accounts if simple activation func that is able to be undone, if not, we use caching to store previous z value.
@@ -21,34 +21,11 @@ dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
 dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
 dC/dw = dC/db * a(prev)
 
-Prev Changes: 
-- added loss func parameter to command line and implemented loss_func() to return 3 diff loss functions, MSE, MAE, BCE, & Focal loss
-- working on implementing recursive backwards pass
-    * updated forward pass to save activations in list self.model_activations (np array) to be used in backwards pass calculation
-    * updated self.indices to include indices for self.model_activations
-    * created new instance variable, self.model_activations_idx to track which activation we are on throughout forward pass
-- adjusted print statements of forward pass to match backwards pass
-- deleted redundant variable for creating key values of self.indices
-- fixed bug with num_layers where I wasn't counting the output layer at self.indices["num_layers"]'s initialization so output layer's
-weights and biases weren't generated. Pretty easy fix, but integral to model function as previously my output layer activations weren't
-being calculated!
+### Cur Changes:
+- backwards pass implemented successfully fixed vector math
+- reorganized readme
 
-Cur Changes:
-- fixed error with implementation of self.indices where it didn't include first input layer in model.activations
-    * adjusted forward method to append input layer's activations to self.model_activations
-- adjusted activation_func method to output additional bool at end of tuple. Ex. output: (loss_func, deriv_loss_func, True)
-    * this boolean represents whether or not we need caching 
-    ### TODO:
-    * adjusted forward method to include caching of z value in forward pass if self.cache is true
-        - adjusted self.__init__ to support caching by initiazlizing array self.cached_z_values IF self.cache == True, populated indexes along with
-        self.model_activations.
-        - cached_z does not need to store first layer so initializiation is np.sum(self.layers[1:]) (every layer except input layer)
-            * was able to recycle code for populating self.model_activations
-    * technically the math isnt exactly correct for a'(z(w)), but since their derivatives are linear transformations of original a, we can use current activations without calculating previous z value or caching z in forward pass
-    * we only cache for activation funcs that destroy the gradients (so we can't use the current activation as an cheap computational substitution) and/or are too computationally expensive to undo to retrieve the z value?
-- fixed implementation of activation funcs to vectorize np arrays to take in full vector at one time rather than individually iterate with for loops
-
-Challenges:
+### Challenges:
 - had to make sure to first create an np.zeros array that is the size for all hidden layers combined for self.model_activations in 
 order to modify arrays in-place. Initially when I implemented self.model_activations, I created an empty array and planned to append
 each activation layer individually to self.model_activations. HOWEVER, np arrays have immutable allocation of memory, so np.append 
@@ -58,15 +35,9 @@ to self.model_array during forward pass.
     - same thing for self.cached_z array!
     - changed np arrays of self.model_activations and self.cached_z via index slicing rather than iterating thru individual elements
 
-TODO: 
+### TODO: 
 High Prio:
-- change activation functions to take in np layers and use native np functions
-- change appending to activation and z arrays using index slicing not for loops, optimize? ask gemini to make sure its in place and not memory intensive mistake
-- backwards method complete dynamically
-    - update weights (no logic for cache yet)
-    - bias logic (no logic or cache yet)
-    - caching logic
-    - create y backwards array to feed into backwards method that shows full activation for appropriate index for label (array of length 10) 
+- create method to geenerate correct output layer tensor for backwards pass based off of label
 - create training loop to pass data in batches
 - create method for model to save weights and biases in txt file to not lose progress
 - implement performance method to track F1 & loss over time
@@ -78,3 +49,31 @@ Low Prio:
 AI Use:
 AI was used STRICTLY only for undestanding concepts and minor bug fixing. It was mainly consulted for the architecture of how I should implement my MLP in an 1D
 setting as well as to help me wrap my head around the conceptual side of ML. i.e. Hidden Layer Architecture, the calculus of the Forward/Backward Pass, test v.s. training sets, performance measuring utilizing F1 & loss, etc.
+
+### Prev Changes: 
+# July 8th:
+- added loss func parameter to command line and implemented loss_func() to return 3 diff loss functions, MSE, MAE, BCE, & Focal loss
+- working on implementing recursive backwards pass
+    * updated forward pass to save activations in list self.model_activations (np array) to be used in backwards pass calculation
+    * updated self.indices to include indices for self.model_activations
+    * created new instance variable, self.model_activations_idx to track which activation we are on throughout forward pass
+- adjusted print statements of forward pass to match backwards pass
+- deleted redundant variable for creating key values of self.indices
+- fixed bug with num_layers where I wasn't counting the output layer at self.indices["num_layers"]'s initialization so output layer's
+weights and biases weren't generated. Pretty easy fix, but integral to model function as previously my output layer activations weren't
+being calculated!
+# July 9th:
+- fixed error with implementation of self.indices where it didn't include first input layer in model.activations
+    * adjusted forward method to append input layer's activations to self.model_activations
+- adjusted activation_func method to output additional bool at end of tuple. Ex. output: (loss_func, deriv_loss_func, True)
+    * this boolean represents whether or not we need caching 
+    * adjusted forward method to include caching of z value in forward pass if self.cache is true
+        - adjusted self.__init__ to support caching by initiazlizing array self.cached_z_values IF self.cache == True, populated indexes along with
+        self.model_activations.
+        - cached_z does not need to store first layer so initializiation is np.sum(self.layers[1:]) (every layer except input layer)
+            * was able to recycle code for populating self.model_activations
+    * technically the math isnt exactly correct for a'(z(w)), but since their derivatives are linear transformations of original a, we can use current activations without calculating previous z value or caching z in forward pass
+    * we only cache for activation funcs that destroy the gradients (so we can't use the current activation as an cheap computational substitution) and/or are too computationally expensive to undo to retrieve the z value?
+- fixed implementation of activation funcs to vectorize np arrays to take in full vector at one time rather than individually iterate with for loops
+- changed activation functions to take in np layers and use native np functions
+- changed appending to activation and z arrays using index slicing not for loops, optimize? ask gemini to make sure its in place and not memory intensive mistake
