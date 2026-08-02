@@ -1,31 +1,23 @@
-Author: Tyler Waltner
-Email: waltnertyler@gmail.com
-Date: Jul 5th, 2026
+Author: Tyler Waltner 
+Date: Jul 10th, 2026
+Emails: waltnertyler@gmail.com
+        twaltner@u.rochester.edu
 
-### Features:
-Dynamic Command-Line Args to specify model 
-Model weights and biases stored in 1D array
-activation func method: accounts if simple activation func that is able to be undone, if not, we use caching to store previous z value.
 
-# adjust
-we only cache for activation funcs that destroy the gradients (so we can't use the current activation as an cheap computational substitution) and/or are too computationally expensive to undo to retrieve the z value?
+Project Overview: Dynamic Multi-Layer Perceptron (MLP)
+- A fully custom, from-scratch Multi-Layer Perceptron (MLP) built in Python and NumPy to classify the FashionMNIST dataset. This project demonstrates the application of fundamentals I have learnt throughout my university courses of linear algebra, introduction to AI, and calculus. I purposely implemented this project without without relying on high-level machine learning frameworks so I can learn more about the topics first hand and build low-level memory optimizations from scratch.  
+Key Technical Achievements:
+Memory-Optimized Architecture: 
+- Engineered a unique 1D array state system for weights and biases, avoiding NumPy's memory reallocation overhead by pre-allocating np.zeros arrays and modifying them in-place during recursive forward and backward passes.  
+Algorithmic Efficiency: 
+- Streamlined backpropagation calculus by calculating the gradient with respect to biases first, using it to efficiently derive the gradient with respect to weights to prevent redundant computations. Implemented a lightweight data shuffling algorithm using an index array to reduce memory consumption during batching.  
+Dynamic & Configurable: 
+- Highly flexible via command-line arguments, supporting dynamic hidden layer sizes, dynamic feature scaling (normalization/standardization), and interchangeable activation and loss functions.  
+Smart State Caching: 
+- Built a custom activation function handler that selectively caches pre-activation values only when required by functions that destroy gradients (e.g., ReLU), optimizing overall RAM usage.
 
-Forward pass: implemented with recursion to go thru deeper each layer, and for loop for iterating thru each individual node in layer
 
-Backward pass: implmented with recursion to propagate thru layers until reach very first hidden layer, used dC/db to calculate dC/dw instead of recalculating C'a(z(w)) * a'(z(w)) since: 
-Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
-dC/db = C'(a(z(w))) * a'(z(w)) * 1
-dC/db = C'(a(z(w))) * a'(z(w))
-Change of Cost to Weights: C = cost (aka loss), a = activ, z = value before activation w = weight 
-dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
-dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
-dC/dw = dC/db * a(prev)
-
-### Cur Changes:
-- backwards pass implemented successfully fixed vector math
-- reorganized readme
-
-### Challenges:
+Notable Challenges:
 - had to make sure to first create an np.zeros array that is the size for all hidden layers combined for self.model_activations in 
 order to modify arrays in-place. Initially when I implemented self.model_activations, I created an empty array and planned to append
 each activation layer individually to self.model_activations. HOWEVER, np arrays have immutable allocation of memory, so np.append 
@@ -34,24 +26,41 @@ memory via creating np.zeros array of final array size, and created self.model_a
 to self.model_array during forward pass.
     - same thing for self.cached_z array!
     - changed np arrays of self.model_activations and self.cached_z via index slicing rather than iterating thru individual elements
-
-### TODO: 
-High Prio:
-- create method to geenerate correct output layer tensor for backwards pass based off of label
-- create training loop to pass data in batches
-- create method for model to save weights and biases in txt file to not lose progress
-- implement performance method to track F1 & loss over time
- 
-Low Prio: 
-- implement bce & focal loss funcs & derivs
-- delete print stmts for forward & backward pass? only need prints for epochs, etc?
+- instead of using random.shuffle(dataset) to shuffle data, which creates an entirely new array, I make an lightweight array of indices
+from 0 to len(dataset) - 1, [0, 1, 2, 3, ... , 59999] and then random.shuffle that array to retrieve the first batch_size indexes of that array 
+to use as our samples for our batch each epoch.
 
 AI Use:
-AI was used STRICTLY only for undestanding concepts and minor bug fixing. It was mainly consulted for the architecture of how I should implement my MLP in an 1D
-setting as well as to help me wrap my head around the conceptual side of ML. i.e. Hidden Layer Architecture, the calculus of the Forward/Backward Pass, test v.s. training sets, performance measuring utilizing F1 & loss, etc.
+AI was used primarily used only for undestanding concepts and minor bug fixing. It was mainly consulted for the architecture of how I should implement my MLP in an 1D setting as well as to help me wrap my head around the conceptual side of ML. i.e. Hidden Layer Architecture, the calculus of the Forward/Backward Pass, test v.s. training sets, performance measuring utilizing F1 & loss, softmax, etc.
 
-### Prev Changes: 
-# July 8th:
+
+Misc Notes for self:
+- Dynamic Command-Line Args to specify model 
+- Model weights and biases stored in 1D array
+- Activation func method: accounts if simple activation func that is able to be undone, if not, we use caching to store previous z value.
+- Loss func method: takes in specified loss function via command line and outputs appropriate loss func & its derivative to be used in backwards pass and performance evaluation
+- Forward pass: implemented with recursion to go thru deeper each layer, and for loop for iterating thru each individual node in layer
+- Backward pass: implmented with recursion to propagate thru layers until reach very first hidden layer, used dC/db to calculate dC/dw instead of recalculating C'a(z(w)) * a'(z(w)) since: 
+    Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
+    dC/db = C'(a(z(w))) * a'(z(w)) * 1
+    dC/db = C'(a(z(w))) * a'(z(w))
+    Change of Cost to Weights: C = cost (aka loss), a = activ, z = value before activation w = weight 
+    dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
+    dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
+    dC/dw = dC/db * a(prev)
+
+
+TODO for ver. 2 batching implementation: 
+- add outer layer different activation function from hidden layers, add so can be specified? implement in forward / backward pass special case for last passes
+- create training loop to pass data in batches
+- another paramter to specify if we are training or testing dataset, dont load datasets if train or test or if no model saved cant test
+- make ability to save model in txt file to not lose progress
+- implement performance method to track F1 & loss over time
+- implement bce & focal loss funcs & derivs
+
+
+Prev Changes: 
+July 8th:
 - added loss func parameter to command line and implemented loss_func() to return 3 diff loss functions, MSE, MAE, BCE, & Focal loss
 - working on implementing recursive backwards pass
     * updated forward pass to save activations in list self.model_activations (np array) to be used in backwards pass calculation
@@ -62,7 +71,8 @@ setting as well as to help me wrap my head around the conceptual side of ML. i.e
 - fixed bug with num_layers where I wasn't counting the output layer at self.indices["num_layers"]'s initialization so output layer's
 weights and biases weren't generated. Pretty easy fix, but integral to model function as previously my output layer activations weren't
 being calculated!
-# July 9th:
+
+July 9th:
 - fixed error with implementation of self.indices where it didn't include first input layer in model.activations
     * adjusted forward method to append input layer's activations to self.model_activations
 - adjusted activation_func method to output additional bool at end of tuple. Ex. output: (loss_func, deriv_loss_func, True)
@@ -77,3 +87,27 @@ being calculated!
 - fixed implementation of activation funcs to vectorize np arrays to take in full vector at one time rather than individually iterate with for loops
 - changed activation functions to take in np layers and use native np functions
 - changed appending to activation and z arrays using index slicing not for loops, optimize? ask gemini to make sure its in place and not memory intensive mistake
+
+July 10th:
+- backwards pass implemented successfully fixed vector math
+- reorganized readme
+- removed redundant .flatten() from backwards method for calculating element wise product of dC/db
+- fixed error of tanh derivative previous was 1 - np.exp(arr, 2) but this puts it to exponent of natural log constant 'e', simple fix, 
+just corrected to np.square(arr)
+- fixed error of relu derivative, previously was using np.clip which left values between 0-1 as is (Ex: if value was 0.5 method did not
+change) now use np.where(vector > 0, 1, 0) to correctly output 1 for any > 0 values and 0 for anything <= 0.
+- added option of leaky relu due to exploding gradients from testing 
+- added normalization / standardization methods for input data, added another parameter via commandline to specify if you want data 
+normalized or standardized
+- created training loop
+
+July 19th:
+- added feature scaling
+    * scaling_func() function to return either normalize function or standardize function
+        - both funcs returns respective scaled np arrays
+    * added another parameter in command line to specify normlization or standardization
+- added softmax
+- new command line parameter to specify output layer activation function
+- new command line parameter to specify batch size
+- training loop in main()
+    - shuffling data using dataloader

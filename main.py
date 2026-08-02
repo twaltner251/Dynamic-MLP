@@ -1,9 +1,10 @@
 # MLP implemented by Tyler Waltner 
-# Date: Jul 5th, 2026
-# Email: waltnertyler@gmail.com
+# Date: Jul 10th, 2026
+# Emails: waltnertyler@gmail.com
+#         twaltner@u.rochester.edu
 
-import math
 import numpy as np
+import random
 import sys
 import mnist_reader
 
@@ -22,37 +23,54 @@ Labels Array:
 9	Ankle boot
 '''
 
-# returns tuple of activation func as well as its derivative to be passed into MLP
-def activation_func(func: str): # last bool in output tuple represents whether caching is needed or not in Forward pass
+# returns tuple of activation func, its derivative, and bool represents whether caching is needed or not in Forward pass to be passed into MLP
+def activation_func(func: str): 
     f = func.lower() # normalize str by making lowercase
 
     if f == 'sig' or f == 'sigmoid':
         def sigmoid(vector):
             return 1 / (1 + np.exp(-vector))
-        def deriv_sigmoid(previous_sigmoid): 
+        def deriv_sigmoid(prev_sig): 
             # forward pass calculated our sigmoid values, so when we input we can use it to calculate derivative of sig(x) which = (1 - sig(x)) * sig(x)
-            return (1 - previous_sigmoid) * previous_sigmoid
+            return (1 - prev_sig) * prev_sig
         return sigmoid, deriv_sigmoid, False
+   
+    elif f == 'tanh':
+        def tanh(vector):
+            return np.tanh(vector)
+        def deriv_tanh(prev_tanh):
+            return 1 - np.square(prev_tanh)
+        return tanh, deriv_tanh, False
     
     elif f == 'relu':
         def relu(vector):
             return np.maximum(0, vector)
         def deriv_relu(vector):
-            return np.clip(vector, 0, 1) 
+            return np.where(vector > 0, 1, 0) # where vector > 0, assign value to 1, else = 0
         return relu, deriv_relu, True # relu need to cache due to destroying gradients when value is < 0
     
-    elif f == 'tanh':
-        def tanh(vector):
-            return np.tanh(vector)
-        def deriv_tanh(previous_tanh):
-            return 1 - np.exp(previous_tanh, 2)
-        return tanh, deriv_tanh, False
+    elif f == 'leaky_relu':
+        def leaky_relu(vector):
+            return np.maximum(0.01 * vector, vector)
+        def deriv_relu(vector):
+            return np.where(vector > 0, 1, 0.01) # where vector > 0, assign value to 1, else = 0
+        return leaky_relu, deriv_relu, True # relu need to cache due to destroying gradients when value is < 0
     
+    elif f == 'smax': # soft max
+        def soft_max(vector):
+            e_exp = np.exp(vector)
+            return e_exp / np.sum(e_exp)
+        def deriv_soft_max(prev_smax):
+            # deriv of softmax is jacobian
+            return np.diag(prev_smax) - np.outer(prev_smax, prev_smax)
+        return soft_max, deriv_soft_max, True
+
     else:
-        print("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, tanh for Tanh)")
+        print("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky ReLU, tanh for Tanh, smax for Soft Max)")
         sys.exit()
 
 
+# returns tuple of loss func as well as derivative to be passed into MLP
 def loss_func(func: str):
     # y = actual, y_hat = predicted
     if func == "mse":
@@ -89,12 +107,30 @@ def loss_func(func: str):
         sys.exit()
 
 
+# return appropriate feature scaling function
+def scaling_func(func: str):
+    if func == "norm":
+        def normalize(vector):
+            return (vector - np.min(vector)) / (np.max(vector) - np.min(vector))
+        return normalize
+
+    elif func == "stdz":
+        def standardize(vector):
+            return (vector - np.mean(vector)) / np.std(vector)
+        return standardize
+
+    else:
+        print("invalid input for feature scaling function, please input one of the following options: norm for Normalization, stdz for Standardization")
+        sys.exit()
+
+
 class MLP:
-    def __init__(self, layers, actv_funcs, loss):
+    def __init__(self, layers, actv_funcs, outer_func, loss):
         # weights and biases in 1D array, length of portions specified by input list input with our weights one row at a time product 
         # randomly generated based off of hidden layer dimensions, activation/loss funcs assigned by activ/loss func methods
         self.layers = layers
         self.actv_func, self.deriv_actv_func, self.cache = actv_funcs
+        self.outer_func = outer_func
         self.loss_func, self.deriv_loss_func = loss
         
         # index dictionary to track indices of weights & biases of each layer
@@ -158,10 +194,17 @@ class MLP:
 
 
     def forward(self, activations: list[float], idx: int):
-        if idx == 1: # if we are on first forward pass, add in input layer's activations
-            for a in activations:
-                self.model_activations[self.model_activations_idx] = a
-                self.model_activations_idx += 1 # increment idx tracking
+        if idx == 1: # if we are on first forward pass
+            # reset idx tracker for activation
+            self.model_activations_idx = 0
+
+            if self.cache: # if caching, then also reset idx tracker for cached z values
+                self.cached_z_idx = 0
+            
+            # add input layer's activations to self.model_activations
+            num_a = len(activations)
+            self.model_activations[self.model_activations_idx: num_a] = activations
+            self.model_activations_idx +=  num_a # increment idx tracking
 
         # z = pre-activation value
         # a = activation
@@ -190,10 +233,10 @@ class MLP:
         # pass z thru activation func
         cur_a = self.actv_func(cur_z)
 
-        # append each activation in cur_a (current activations) to self.model_activations
-        for a in cur_a:
-            self.model_activations[self.model_activations_idx] = a
-            self.model_activations_idx += 1 # increment idx tracking
+        # append current activations (cur_a) to self.model_activations
+        num_a = len(cur_a) # number of activations in layer
+        self.model_activations[self.model_activations_idx: self.model_activations_idx + num_a] = cur_a
+        self.model_activations_idx += num_a # increment idx tracking
 
         # recursion portion, if layer is NOT last layer (aka output layer): go deeper, else: return current activation
         if idx != self.indices["num_layers"]:
@@ -203,6 +246,7 @@ class MLP:
         else:
             print(f"Forward Pass of layer {idx} complete")
             print("ending recursion")
+            return cur_a # return output layer
         
 
     def backward(self, y, learning_rate: float, idx: int):
@@ -236,7 +280,7 @@ class MLP:
             cur_z_beg, cur_z_end = self.indices[f"layer_{cur_layer}_z"]
             cur_z = self.cached_z[cur_z_beg: cur_z_end + 1] # +1 at end because list indexing is NOT inclusive of 2nd index
             da_dz = self.deriv_actv_func(cur_z)
-        else:
+        else: # if we didn't cache, we can pass in current activation in deriv of activation func to obtain da/dz as activation func preserves gradients
             da_dz = self.deriv_actv_func(cur_a)
 
         # can use dC/db to calculate dC_dw since:
@@ -247,11 +291,10 @@ class MLP:
         # dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
         # dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
         # dC/dw = dC/db * a(prev)
+        # calculate dC/db using element-wise mult 
+        dC_db = dC_da * da_dz
         
-        # calculate dC/db, use .flatten() to ensure element-wise mult
-        dC_db = dC_da.flatten() * da_dz.flatten()
-        
-        # use np.outer to use outer product generate 2d matrix from 1D vectors
+        # use np.outer to use outer product generate 2d matrix from 1D vectors (breaks with np.dot as )
         dC_dw_2d = np.outer(dC_db, prev_a)
         dC_dw = dC_dw_2d.flatten() # flatten back to 1d array
 
@@ -279,45 +322,82 @@ class MLP:
             print("ending recursion")
     
 
-def take_input(): # handle commandline input, organize information of model
-    if len(sys.argv) < 7:
-        print('Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig mse 100 0.1\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1')
-        return
+# handle commandline input, organize information of model
+def take_input():
+    if len(sys.argv) < 10:
+        print('Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func for hidden layers, activation func for outer layers, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig smax mse 100 0.1 norm\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation funcs: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1, norm for normalization')
+        sys.exit()
 
     data_path = sys.argv[1]
     hidden_layers = []
-    num_hidden_layers = len(sys.argv) - 5
+    num_hidden_layers = len(sys.argv) - 8
     
     for layer in range(2,num_hidden_layers):
         hidden_layers.append(int(sys.argv[layer]))
 
     num_classes = int(sys.argv[num_hidden_layers])
     actv_funcs = activation_func(sys.argv[num_hidden_layers + 1].lower()) # pass thru activation_func() to output correct actv_func 
-    loss = loss_func(sys.argv[num_hidden_layers + 2].lower())
-    epochs = int(sys.argv[num_hidden_layers + 3])
-    learn_rate = float(sys.argv[num_hidden_layers + 4])
+    outer_func = activation_func(sys.argv[num_hidden_layers + 2].lower())
+    loss = loss_func(sys.argv[num_hidden_layers + 3].lower())
+    epochs = int(sys.argv[num_hidden_layers + 4])
+    batch_size = int(sys.argv[num_hidden_layers + 5])
+    learn_rate = float(sys.argv[num_hidden_layers + 6])
+    feat_func = scaling_func(sys.argv[num_hidden_layers + 7])
 
-    return data_path, hidden_layers, num_classes, actv_funcs, loss, epochs, learn_rate
+    return data_path, hidden_layers, num_classes, actv_funcs, outer_func, loss, epochs, batch_size, learn_rate, feat_func
+
+
+# returns "true" output layer to be compared to predicted
+def construct_label_array(y_label: int, output_size: int): 
+    label_arr = np.zeros(output_size)
+    label_arr[y_label] = 1
+    return label_arr
 
 
 def main():
     # handle command line args
-    data_path, hidden_layers, num_classes, actv_funcs, loss, epochs, learn_rate = take_input()
+    data_path, hidden_layers, num_classes, actv_funcs, outer_func, loss, epochs, batch_size, learn_rate, feat_func = take_input()
 
     # load data
     X_train, y_train = mnist_reader.load_mnist(data_path, kind='train')
     X_test, y_test = mnist_reader.load_mnist(data_path, kind='t10k')
     
+    # normalize data
+    X_train = feat_func(X_train)
+    X_test = feat_func(X_test)
+
     input_size = len(X_train[0]) # set input size
     
+    # idx array, [0, 1, 2, 3, ... , 59999]
+    idx = np.arange(len(X_train))
+
+    # construct layer count to be passed into MLP
     layers = [input_size] + hidden_layers + [num_classes]
 
-    model = MLP(layers, actv_funcs, loss)
+    # instantiate model
+    model = MLP(layers, actv_funcs, outer_func, loss)
 
-    model.forward(X_train[0], 1)
+    # training loop
+    for e in range(epochs):
+        # shuffle idx array in-place with np.random.shuffle() each epoch
+        np.random.shuffle(idx)
     
-    # place holder backwards pass input
-    model.backward([0,1,2,3,4,5,6,7,8,9], learn_rate, 1)
+        # iterates thru entire dataset using interval batch_size
+        for k in range(0, len(X_train), batch_size):
+            batch_idx = idx[k: k + batch_size]
+
+            # iterate thru batch
+            for i in batch_idx:
+                # grab inputs and appropriate labels
+                x = X_train[i]
+                y = y_train[i]
+                
+                model.forward(x, 1) # forward pass
+
+                # construct output array to pass thru backward pass
+                y_output = construct_label_array(y, num_classes)
+
+                model.backward(y_output, learn_rate, 1) # backward pass
 
 
 main()
