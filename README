@@ -1,5 +1,5 @@
 Author: Tyler Waltner 
-Date: Jul 10th, 2026
+Date: Aug 27th, 2026
 Emails: waltnertyler@gmail.com
         twaltner@u.rochester.edu
 
@@ -15,6 +15,8 @@ Dynamic & Configurable:
 - Highly flexible via command-line arguments, supporting dynamic hidden layer sizes, dynamic feature scaling (normalization/standardization), and interchangeable activation and loss functions.  
 Smart State Caching: 
 - Built a custom activation function handler that selectively caches pre-activation values only when required by functions that destroy gradients (e.g., ReLU), optimizing overall RAM usage.
+Custo, Input Error Pipeline:
+- Incorporated smooth error pipelining to isolate errors in user input
 
 Instructions for use:
 Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func for hidden layers, activation func for outer layers, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig smax mse 100 0.1 norm\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation funcs: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1, norm for normalization
