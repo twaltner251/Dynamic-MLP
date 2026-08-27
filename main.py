@@ -1,5 +1,5 @@
 # MLP implemented by Tyler Waltner 
-# Date: Jul 10th, 2026
+# Date: Aug 27th, 2026
 # Emails: waltnertyler@gmail.com
 #         twaltner@u.rochester.edu
 
@@ -17,7 +17,7 @@ Labels Array:
 3	Dress
 4	Coat
 5	Sandal
-6	Shirt
+6	Shirts
 7	Sneaker
 8	Bag
 9	Ankle boot
@@ -66,8 +66,7 @@ def activation_func(func: str):
         return soft_max, deriv_soft_max, True
 
     else:
-        print("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky ReLU, tanh for Tanh, smax for Soft Max)")
-        sys.exit()
+        raise TypeError("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky ReLU, tanh for Tanh, smax for Soft Max)")
 
 
 # returns tuple of loss func as well as derivative to be passed into MLP
@@ -103,8 +102,8 @@ def loss_func(func: str):
         return focal_loss, deriv_focal_loss
     
     else:
-        print("invalid input for loss func, please input either one of the following in the command line args for loss:\nmse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss")
-        sys.exit()
+        raise TypeError("invalid input for loss func, please input either one of the following in the command line args for loss:\nmse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss")
+        
 
 
 # return appropriate feature scaling function
@@ -120,8 +119,7 @@ def scaling_func(func: str):
         return standardize
 
     else:
-        print("invalid input for feature scaling function, please input one of the following options: norm for Normalization, stdz for Standardization")
-        sys.exit()
+        raise TypeError("invalid input for feature scaling function, please input one of the following options: norm for Normalization, stdz for Standardization")
 
 
 class MLP:
@@ -324,25 +322,87 @@ class MLP:
 
 # handle commandline input, organize information of model
 def take_input():
-    if len(sys.argv) < 10:
-        print('Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func for hidden layers, activation func for outer layers, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig smax mse 100 0.1 norm\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation funcs: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1, norm for normalization')
-        sys.exit()
+    example_input = "python3 main.py data/fashion 128 16 10 sig smax mse 100 64 0.1 norm\n" \
+                    "dataset: data/fashion\n" \
+                    "hidden layers: 128, 16\n" \
+                    "num classes: 10\n" \
+                    "inner activation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\n" \
+                    "loss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\n" \
+                    "outer activation func: smax (same as above...)\n" \
+                    "loss: mse (mse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss)" \
+                    "epochs: 100\n" \
+                    "batch size: 64\n" \
+                    "learning rate: 0.1\n" \
+                    "feature scaling: norm (norm for Normalization, stdz for Standardization)"
 
+    num_hidden_layers = max(0, len(sys.argv) - 10) # can't have num_hidden_layers be negative
+    
+    # So if len(sys.argv) - hidden_layers < 10, you guaranteed don't have enough inputs
+    if len(sys.argv) - num_hidden_layers < 10: 
+        print(f'Not enough inputs, please see example input: {example_input}')
+        sys.exit()
+    
     data_path = sys.argv[1]
     hidden_layers = []
-    num_hidden_layers = len(sys.argv) - 8
     
-    for layer in range(2,num_hidden_layers):
-        hidden_layers.append(int(sys.argv[layer]))
+    for layer in sys.argv[2: 2 + num_hidden_layers]:
+        hidden_layers.append(int(layer))
 
-    num_classes = int(sys.argv[num_hidden_layers])
-    actv_funcs = activation_func(sys.argv[num_hidden_layers + 1].lower()) # pass thru activation_func() to output correct actv_func 
-    outer_func = activation_func(sys.argv[num_hidden_layers + 2].lower())
-    loss = loss_func(sys.argv[num_hidden_layers + 3].lower())
-    epochs = int(sys.argv[num_hidden_layers + 4])
-    batch_size = int(sys.argv[num_hidden_layers + 5])
-    learn_rate = float(sys.argv[num_hidden_layers + 6])
-    feat_func = scaling_func(sys.argv[num_hidden_layers + 7])
+    try:
+        num_classes = int(sys.argv[num_hidden_layers + 2])
+        print('classes', num_classes)
+    except ValueError as e:
+        print(f"Error parsing number of classes: {e}.\nReceived: {sys.argv[num_hidden_layers + 2]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        actv_funcs = activation_func(sys.argv[num_hidden_layers + 3].lower()) # pass thru activation_func() to output correct actv_func 
+        print('inner', actv_funcs)
+    except Exception as e:
+        print(f"Error parsing activation function for hidden layers: {e}.\nReceived: {sys.argv[num_hidden_layers + 3]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        outer_func = activation_func(sys.argv[num_hidden_layers + 4].lower())
+        print('outer', outer_func)
+    except Exception as e:
+        print(f"Error parsing activation function for outer layers: {e}.\nReceived: {sys.argv[num_hidden_layers + 4]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        loss = loss_func(sys.argv[num_hidden_layers + 5].lower())
+        print('loss', loss)
+    except Exception as e:
+        print(f"Error parsing loss function: {e}.\nReceived: {sys.argv[num_hidden_layers + 5]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        epochs = int(sys.argv[num_hidden_layers + 6])
+        print('epoch', epochs)
+    except ValueError as e:
+        print(f"Error parsing number of epochs: {e}.\nReceived: {sys.argv[num_hidden_layers + 6]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        batch_size = int(sys.argv[num_hidden_layers + 7])
+        print('batch:', batch_size)
+    except ValueError as e:
+        print(f"Error parsing batch size: {e}.\nReceived: {sys.argv[num_hidden_layers + 7]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        learn_rate = float(sys.argv[num_hidden_layers + 8])
+        print('learn', learn_rate)
+    except ValueError as e:
+        print(f"Error parsing learning rate: {e}.\nReceived: {sys.argv[num_hidden_layers + 8]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        feat_func = scaling_func(sys.argv[num_hidden_layers + 9])
+        print('feat:', feat_func)
+    except Exception as e:
+        print(f"Error parsing feature scaling function: {e}.\nReceived: {sys.argv[num_hidden_layers + 9]}\n\nExample input: {example_input}")
+        sys.exit()
 
     return data_path, hidden_layers, num_classes, actv_funcs, outer_func, loss, epochs, batch_size, learn_rate, feat_func
 
