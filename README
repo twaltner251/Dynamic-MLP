@@ -15,7 +15,7 @@ Dynamic & Configurable:
 - Highly flexible via command-line arguments, supporting dynamic hidden layer sizes, dynamic feature scaling (normalization/standardization), and interchangeable activation and loss functions.  
 Smart State Caching: 
 - Built a custom activation function handler that selectively caches pre-activation values only when required by functions that destroy gradients (e.g., ReLU), optimizing overall RAM usage.
-Custo, Input Error Pipeline:
+Custom, Input Error Pipeline:
 - Incorporated smooth error pipelining to isolate errors in user input
 
 Instructions for use:
