@@ -1,5 +1,5 @@
 # MLP implemented by Tyler Waltner 
-# Date: Jul 10th, 2026
+# Date: Aug 27th, 2026
 # Emails: waltnertyler@gmail.com
 #         twaltner@u.rochester.edu
 
@@ -17,12 +17,13 @@ Labels Array:
 3	Dress
 4	Coat
 5	Sandal
-6	Shirt
+6	Shirts
 7	Sneaker
 8	Bag
 9	Ankle boot
 '''
 
+ 
 # returns tuple of activation func, its derivative, and bool represents whether caching is needed or not in Forward pass to be passed into MLP
 def activation_func(func: str): 
     f = func.lower() # normalize str by making lowercase
@@ -66,8 +67,7 @@ def activation_func(func: str):
         return soft_max, deriv_soft_max, True
 
     else:
-        print("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky ReLU, tanh for Tanh, smax for Soft Max)")
-        sys.exit()
+        raise TypeError("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky ReLU, tanh for Tanh, smax for Soft Max)")
 
 
 # returns tuple of loss func as well as derivative to be passed into MLP
@@ -103,9 +103,8 @@ def loss_func(func: str):
         return focal_loss, deriv_focal_loss
     
     else:
-        print("invalid input for loss func, please input either one of the following in the command line args for loss:\nmse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss")
-        sys.exit()
-
+        raise TypeError("invalid input for loss func, please input either one of the following in the command line args for loss:\nmse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss")
+        
 
 # return appropriate feature scaling function
 def scaling_func(func: str):
@@ -120,133 +119,37 @@ def scaling_func(func: str):
         return standardize
 
     else:
-        print("invalid input for feature scaling function, please input one of the following options: norm for Normalization, stdz for Standardization")
-        sys.exit()
+        raise TypeError("invalid input for feature scaling function, please input one of the following options: norm for Normalization, stdz for Standardization")
 
 
 class MLP:
-    def __init__(self, layers, actv_funcs, outer_func, loss):
-        # weights and biases in 1D array, length of portions specified by input list input with our weights one row at a time product 
-        # randomly generated based off of hidden layer dimensions, activation/loss funcs assigned by activ/loss func methods
-        self.layers = layers
-        self.actv_func, self.deriv_actv_func, self.cache = actv_funcs
-        self.outer_func = outer_func
-        self.loss_func, self.deriv_loss_func = loss
-        
-        # index dictionary to track indices of weights & biases of each layer
-        self.indices = {"num_layers": len(layers) - 1} # (num_layers inclusive of output layer)
+    def __init__(self, layers, actv_funcs, outer_funcs, loss, batch_size):
+        self.layers = layers # input + hidden + output layer #'s in array
+        self.a_func, self.da_func, self.a_cache = actv_funcs # self.cache is boolean of if we cache for this function or not
+        self.out_a_func, self.out_da_func, self.out_a_cache = outer_funcs 
+        self.l_func, self.dl_func = loss
+        self.batch_size = batch_size = batch_size
 
-        # IF we are caching z values:
-        if self.cache: 
-            # cached_z does not need to store first layer (activations)
-            self.cached_z = np.zeros(sum(self.layers[1:])) 
+        # arrays to store weights & biases
+        self.weights = [] 
+        self.biases = []
 
-            # counter for tracking which z's haven't been cached yet
-            self.cached_z_idx = 0
-
-            # add indices of cached_z of each layer to self.indices (z values added later in forward pass)
-            prev_idx = 0
-            for i in range(1, self.indices["num_layers"] + 1):
-                cur_idx = prev_idx + self.layers[i] - 1
-                self.indices[f"layer_{i}_z"] = (prev_idx, cur_idx)
-                prev_idx = cur_idx + 1
-
-        # initialize array to store forward pass activations
-        self.model_activations = np.zeros(sum(self.layers))
-        
-        # counter for tracking which activations haven't been populated inside of model_activations (utilized in forward pass)
-        self.model_activations_idx = 0
-
-        # add indices of model_activations of each layer to self.indices (activation values added later in forward pass)
-        prev_idx = 0
-        for i in range(0, self.indices["num_layers"] + 1):
-            cur_idx = prev_idx + self.layers[i] - 1
-            self.indices[f"layer_{i}_activations"] = (prev_idx, cur_idx)
-            prev_idx = cur_idx + 1 # update prev_idx
-
-        model_array = []
-        prev_idx = 0    
-        cur_idx = 0
-        for i in range(1, len(layers)): # construct model_array and populate self.indices dictionary
-            prev_layer = self.layers[i-1]
-            
-            cur_layer = self.layers[i]
-
-            num_weights = prev_layer * cur_layer
-
-            num_biases = cur_layer
-
-            # initialize random weights & biases for layer
-            model_array.append(np.random.randn(num_weights))
-            model_array.append(np.zeros(num_biases))
-            
-            w_end_idx = prev_idx + num_weights - 1
-            cur_idx = prev_idx + num_weights + num_biases - 1
-
-            # update indices dict
-            self.indices[f"layer_{i}_weights"] = (prev_idx, w_end_idx)
-            self.indices[f"layer_{i}_biases"] = (w_end_idx + 1, cur_idx)
-
-            # update prev_idx
-            prev_idx = cur_idx + 1
-
-        self.model_array = np.concatenate(model_array)
+        for i in range(1, len(self.layers)):
+            print(i, layers[i])
+            self.weights.append(np.random.randn(layers[i], layers[i - 1]))
+            if i != len(self.layers) - 1: # if not on last layer append to biases
+                self.biases.append(np.zeros(layers[i]))
 
 
     def forward(self, activations: list[float], idx: int):
-        if idx == 1: # if we are on first forward pass
-            # reset idx tracker for activation
-            self.model_activations_idx = 0
-
-            if self.cache: # if caching, then also reset idx tracker for cached z values
-                self.cached_z_idx = 0
-            
-            # add input layer's activations to self.model_activations
-            num_a = len(activations)
-            self.model_activations[self.model_activations_idx: num_a] = activations
-            self.model_activations_idx +=  num_a # increment idx tracking
+        
 
         # z = pre-activation value
         # a = activation
         # z = w * prev_a + b
         # cur_a = actv(z)
 
-        # extract indexes
-        w_start, w_end = self.indices[f"layer_{idx}_weights"]
-        b_start, b_end = self.indices[f"layer_{idx}_biases"]
-
-        # extract weights & biases from main array
-        w_1d = self.model_array[w_start:w_end + 1]
-        b_1d = self.model_array[b_start:b_end + 1]
-
-        # transpose weights to 2d matrix to multiply by prev activations
-        w_2d = w_1d.reshape(self.layers[idx], len(activations))
-        
-        # calulate pre-activation func
-        cur_z = np.dot(w_2d, activations) + b_1d
-
-        # IF caching z value:
-        if self.cache:
-            self.cached_z[self.cached_z_idx: self.cached_z_idx + len(cur_z)] = cur_z 
-            self.cached_z_idx += len(cur_z) # increment idx tracking
-    
-        # pass z thru activation func
-        cur_a = self.actv_func(cur_z)
-
-        # append current activations (cur_a) to self.model_activations
-        num_a = len(cur_a) # number of activations in layer
-        self.model_activations[self.model_activations_idx: self.model_activations_idx + num_a] = cur_a
-        self.model_activations_idx += num_a # increment idx tracking
-
-        # recursion portion, if layer is NOT last layer (aka output layer): go deeper, else: return current activation
-        if idx != self.indices["num_layers"]:
-            print(f"Forward Pass of layer {idx} complete")
-            return self.forward(cur_a, idx + 1)
-
-        else:
-            print(f"Forward Pass of layer {idx} complete")
-            print("ending recursion")
-            return cur_a # return output layer
+        return
         
 
     def backward(self, y, learning_rate: float, idx: int):
@@ -254,35 +157,7 @@ class MLP:
         # Chain Rule: 
         # F'(g(x)) = F'(g(x)) * g'(x)
         # z = w * a + b
-        cur_layer = self.indices["num_layers"] + 1 - idx
-
-        # extract tuples of indices for activations of current/prev layers, weights, and biases
-        cur_a_beg, cur_a_end = self.indices[f"layer_{cur_layer}_activations"] 
-        prev_a_beg, prev_a_end = self.indices[f"layer_{cur_layer - 1}_activations"] 
-        w_beg, w_end = self.indices[f"layer_{cur_layer}_weights"]
-        b_beg, b_end = self.indices[f"layer_{cur_layer}_biases"]
-
-        # extract activations of current and prev layers from self.model_activations array and extract current weights/biases from self.model_array
-        cur_a = self.model_activations[cur_a_beg: cur_a_end + 1] # +1 at end because list indexing is NOT inclusive of 2nd index
-        prev_a = self.model_activations[prev_a_beg: prev_a_end + 1] # ^^^
-        cur_w = self.model_array[w_beg: w_end + 1]                  # ^^^
-        cur_b = self.model_array[b_beg: b_end + 1]                  # ^^^
-
-        dC_da = None
-        if idx == 1:
-            dC_da = self.deriv_loss_func(y, cur_a)
-        else: 
-            dC_da = y
-
-        # assign da/dz based off of if we cached or not
-        da_dz = None
-        if self.cache:
-            cur_z_beg, cur_z_end = self.indices[f"layer_{cur_layer}_z"]
-            cur_z = self.cached_z[cur_z_beg: cur_z_end + 1] # +1 at end because list indexing is NOT inclusive of 2nd index
-            da_dz = self.deriv_actv_func(cur_z)
-        else: # if we didn't cache, we can pass in current activation in deriv of activation func to obtain da/dz as activation func preserves gradients
-            da_dz = self.deriv_actv_func(cur_a)
-
+        
         # can use dC/db to calculate dC_dw since:
         # Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
         # dC/db = C'(a(z(w))) * a'(z(w)) * 1
@@ -292,57 +167,99 @@ class MLP:
         # dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
         # dC/dw = dC/db * a(prev)
         # calculate dC/db using element-wise mult 
-        dC_db = dC_da * da_dz
         
-        # use np.outer to use outer product generate 2d matrix from 1D vectors (breaks with np.dot as )
-        dC_dw_2d = np.outer(dC_db, prev_a)
-        dC_dw = dC_dw_2d.flatten() # flatten back to 1d array
-
         # backwards funciton needs to know which direction to decend, so we pass in dC/da(prev) to tell it
         # dC/da(prev) = dC/da * da/dz * dz/da(prev)
         #                               dz/da(prev) <= weights of cur layer (z = w * a + b)
         # dC/da(prev) = dC/da * da/dz * w(cur)
         # dC/da(prev) = dC/db * w(cur)
         # reshape weights to 2d matrix of dimensions (neurons current layer, neurons previous layer)
-        dC_da_prev = np.dot(dC_db, cur_w.reshape(len(cur_a), len(prev_a)))
 
-        # adjust weights / biases SUBTRACT= because want to DESCEND the gradient to minimize solution
-        cur_w -= dC_dw * learning_rate
-        cur_b -= dC_db * learning_rate
-
-        # if not last layer, go deeper one more layer (else, is last layer and can end recursion)
-        if idx != self.indices["num_layers"]: 
-            print(f"Backward Pass of layer {idx} complete")
-
-            # TODO CHANGE INPUTS FOR RECURSIVE STEP
-            return self.backward(dC_da_prev, learning_rate, idx + 1)
-        
-        else:
-            print(f"Backward Pass of layer {idx} complete")
-            print("ending recursion")
-    
+        return
 
 # handle commandline input, organize information of model
 def take_input():
-    if len(sys.argv) < 10:
-        print('Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func for hidden layers, activation func for outer layers, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig smax mse 100 0.1 norm\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation funcs: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1, norm for normalization')
-        sys.exit()
+    example_input = "python3 main.py data/fashion 128 16 10 sig smax mse 100 64 0.1 norm\n" \
+                    "dataset: data/fashion\n" \
+                    "hidden layers: 128, 16\n" \
+                    "num classes: 10\n" \
+                    "inner activation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\n" \
+                    "loss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\n" \
+                    "outer activation func: smax (same as above...)\n" \
+                    "loss: mse (mse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss)" \
+                    "epochs: 100\n" \
+                    "batch size: 64\n" \
+                    "learning rate: 0.1\n" \
+                    "feature scaling: norm (norm for Normalization, stdz for Standardization)"
 
+    num_hidden_layers = max(0, len(sys.argv) - 10) # can't have num_hidden_layers be negative
+    
+    # So if len(sys.argv) - hidden_layers < 10, you guaranteed don't have enough inputs
+    if len(sys.argv) - num_hidden_layers < 10: 
+        print(f'Not enough inputs, please see example input: {example_input}')
+        sys.exit()
+    
     data_path = sys.argv[1]
     hidden_layers = []
-    num_hidden_layers = len(sys.argv) - 8
     
-    for layer in range(2,num_hidden_layers):
-        hidden_layers.append(int(sys.argv[layer]))
+    for layer in sys.argv[2: 2 + num_hidden_layers]:
+        hidden_layers.append(int(layer))
 
-    num_classes = int(sys.argv[num_hidden_layers])
-    actv_funcs = activation_func(sys.argv[num_hidden_layers + 1].lower()) # pass thru activation_func() to output correct actv_func 
-    outer_func = activation_func(sys.argv[num_hidden_layers + 2].lower())
-    loss = loss_func(sys.argv[num_hidden_layers + 3].lower())
-    epochs = int(sys.argv[num_hidden_layers + 4])
-    batch_size = int(sys.argv[num_hidden_layers + 5])
-    learn_rate = float(sys.argv[num_hidden_layers + 6])
-    feat_func = scaling_func(sys.argv[num_hidden_layers + 7])
+    try:
+        num_classes = int(sys.argv[num_hidden_layers + 2])
+        print('classes', num_classes)
+    except ValueError as e:
+        print(f"Error parsing number of classes: {e}.\nReceived: {sys.argv[num_hidden_layers + 2]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        actv_funcs = activation_func(sys.argv[num_hidden_layers + 3].lower()) # pass thru activation_func() to output correct actv_func 
+        print('inner', actv_funcs)
+    except Exception as e:
+        print(f"Error parsing activation function for hidden layers: {e}.\nReceived: {sys.argv[num_hidden_layers + 3]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        outer_func = activation_func(sys.argv[num_hidden_layers + 4].lower())
+        print('outer', outer_func)
+    except Exception as e:
+        print(f"Error parsing activation function for outer layers: {e}.\nReceived: {sys.argv[num_hidden_layers + 4]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        loss = loss_func(sys.argv[num_hidden_layers + 5].lower())
+        print('loss', loss)
+    except Exception as e:
+        print(f"Error parsing loss function: {e}.\nReceived: {sys.argv[num_hidden_layers + 5]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        epochs = int(sys.argv[num_hidden_layers + 6])
+        print('epoch', epochs)
+    except ValueError as e:
+        print(f"Error parsing number of epochs: {e}.\nReceived: {sys.argv[num_hidden_layers + 6]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        batch_size = int(sys.argv[num_hidden_layers + 7])
+        print('batch:', batch_size)
+    except ValueError as e:
+        print(f"Error parsing batch size: {e}.\nReceived: {sys.argv[num_hidden_layers + 7]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        learn_rate = float(sys.argv[num_hidden_layers + 8])
+        print('learn', learn_rate)
+    except ValueError as e:
+        print(f"Error parsing learning rate: {e}.\nReceived: {sys.argv[num_hidden_layers + 8]}\n\nExample input: {example_input}")
+        sys.exit()
+
+    try:
+        feat_func = scaling_func(sys.argv[num_hidden_layers + 9])
+        print('feat:', feat_func)
+    except Exception as e:
+        print(f"Error parsing feature scaling function: {e}.\nReceived: {sys.argv[num_hidden_layers + 9]}\n\nExample input: {example_input}")
+        sys.exit()
 
     return data_path, hidden_layers, num_classes, actv_funcs, outer_func, loss, epochs, batch_size, learn_rate, feat_func
 
@@ -375,10 +292,12 @@ def main():
     layers = [input_size] + hidden_layers + [num_classes]
 
     # instantiate model
-    model = MLP(layers, actv_funcs, outer_func, loss)
+    model = MLP(layers, actv_funcs, outer_func, loss, batch_size)
 
     # training loop
     for e in range(epochs):
+        print('pausing before training loop')
+        return 
         # shuffle idx array in-place with np.random.shuffle() each epoch
         np.random.shuffle(idx)
     

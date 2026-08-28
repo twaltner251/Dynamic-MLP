@@ -1,8 +1,38 @@
 Author: Tyler Waltner 
-Date: Aug 1st, 2026
+Date: Aug 27th, 2026
 Emails: waltnertyler@gmail.com
         twaltner@u.rochester.edu
 
+
+Project Overview: Dynamic Multi-Layer Perceptron (MLP)
+- A fully custom, from-scratch Multi-Layer Perceptron (MLP) built in Python and NumPy to classify the FashionMNIST dataset. This project demonstrates the application of fundamentals I have learnt throughout my university courses of linear algebra, introduction to AI, and calculus. I purposely implemented this project without without relying on high-level machine learning frameworks so I can learn more about the topics first hand and build low-level memory optimizations from scratch.  
+Key Technical Achievements:
+Memory-Optimized Architecture: 
+- Engineered a unique 1D array state system for weights and biases, avoiding NumPy's memory reallocation overhead by pre-allocating np.zeros arrays and modifying them in-place during recursive forward and backward passes.  
+Algorithmic Efficiency: 
+- Streamlined backpropagation calculus by calculating the gradient with respect to biases first, using it to efficiently derive the gradient with respect to weights to prevent redundant computations. Implemented a lightweight data shuffling algorithm using an index array to reduce memory consumption during batching.  
+Dynamic & Configurable: 
+- Highly flexible via command-line arguments, supporting dynamic hidden layer sizes, dynamic feature scaling (normalization/standardization), and interchangeable activation and loss functions.  
+Smart State Caching: 
+- Built a custom activation function handler that selectively caches pre-activation values only when required by functions that destroy gradients (e.g., ReLU), optimizing overall RAM usage.
+Custom, Input Error Pipeline:
+- Incorporated smooth error pipelining to isolate errors in user input
+
+Instructions for use:
+Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func for hidden layers, activation func for outer layers, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig smax mse 100 0.1 norm\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation funcs: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1, norm for normalization
+
+Notable Challenges:
+- had to make sure to first create an np.zeros array that is the size for all hidden layers combined for self.model_activations in 
+order to modify arrays in-place. Initially when I implemented self.model_activations, I created an empty array and planned to append
+each activation layer individually to self.model_activations. HOWEVER, np arrays have immutable allocation of memory, so np.append 
+returns a different array than the original one. So for the sake of memory optimization, rather than appending to it, allocated 
+memory via creating np.zeros array of final array size, and created self.model_activations_idx variable to track idx when appending
+to self.model_array during forward pass.
+    - same thing for self.cached_z array!
+    - changed np arrays of self.model_activations and self.cached_z via index slicing rather than iterating thru individual elements
+- instead of using random.shuffle(dataset) to shuffle data, which creates an entirely new array, I make an lightweight array of indices
+from 0 to len(dataset) - 1, [0, 1, 2, 3, ... , 59999] and then random.shuffle that array to retrieve the first batch_size indexes of that array 
+to use as our samples for our batch each epoch.
 
 AI Use:
 AI was used primarily used only for undestanding concepts and minor bug fixing. It was mainly consulted for the architecture of how I should implement my MLP in an 1D setting as well as to help me wrap my head around the conceptual side of ML. i.e. Hidden Layer Architecture, the calculus of the Forward/Backward Pass, test v.s. training sets, performance measuring utilizing F1 & loss, softmax, etc.
