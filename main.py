@@ -129,28 +129,54 @@ class MLP:
         self.out_a_func, self.out_da_func, self.out_a_cache = outer_funcs 
         self.l_func, self.dl_func = loss
         self.batch_size = batch_size = batch_size
+        self.cache = []
 
         # arrays to store weights & biases
         self.weights = [] 
         self.biases = []
 
         for i in range(1, len(self.layers)):
-            print(i, layers[i])
+            # print(i, layers[i])
             self.weights.append(np.random.randn(layers[i], layers[i - 1]))
             if i != len(self.layers) - 1: # if not on last layer append to biases
                 self.biases.append(np.zeros(layers[i]))
 
 
-    def forward(self, activations: list[float], idx: int):
-        
-
+    def forward(self, prev_a: list[float], idx: int):
         # z = pre-activation value
         # a = activation
         # z = w * prev_a + b
         # cur_a = actv(z)
+        w = self.weights[idx].T
+        b = self.biases[idx]
 
-        return
+        print('idx', idx)
+        print('prev a', np.shape(prev_a))
+        print('w', np.shape(w))
+        print('b', np.shape(b))
         
+        z = np.dot(prev_a, w) + b
+
+        if idx != len(self.layers) - 2: # if not last pass
+            if self.a_cache: # if caching
+                self.cache.append(z) # cache z
+        
+            cur_a = self.a_func(z) # pass pre-activation value thru activation func
+
+        else: # if last pass, use last activation func
+            if self.out_a_cache: # if caching
+                self.cache.append(z) # cache z
+
+            cur_a = self.out_a_func(z) # pass pre-activation value thru activation func
+
+        idx += 1 # increment idx
+
+        if idx != len(self.layers) - 2: # if not on last pass, go deeper
+            return self.forward(cur_a, idx)
+        
+        else: # if last pass
+            return cur_a # return output activation
+
 
     def backward(self, y, learning_rate: float, idx: int):
         # Backprop through layers
@@ -207,56 +233,56 @@ def take_input():
 
     try:
         num_classes = int(sys.argv[num_hidden_layers + 2])
-        print('classes', num_classes)
+        # print('classes', num_classes)
     except ValueError as e:
         print(f"Error parsing number of classes: {e}.\nReceived: {sys.argv[num_hidden_layers + 2]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
         actv_funcs = activation_func(sys.argv[num_hidden_layers + 3].lower()) # pass thru activation_func() to output correct actv_func 
-        print('inner', actv_funcs)
+        # print('inner', actv_funcs)
     except Exception as e:
         print(f"Error parsing activation function for hidden layers: {e}.\nReceived: {sys.argv[num_hidden_layers + 3]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
         outer_func = activation_func(sys.argv[num_hidden_layers + 4].lower())
-        print('outer', outer_func)
+        # print('outer', outer_func)
     except Exception as e:
         print(f"Error parsing activation function for outer layers: {e}.\nReceived: {sys.argv[num_hidden_layers + 4]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
         loss = loss_func(sys.argv[num_hidden_layers + 5].lower())
-        print('loss', loss)
+        # print('loss', loss)
     except Exception as e:
         print(f"Error parsing loss function: {e}.\nReceived: {sys.argv[num_hidden_layers + 5]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
         epochs = int(sys.argv[num_hidden_layers + 6])
-        print('epoch', epochs)
+        # print('epoch', epochs)
     except ValueError as e:
         print(f"Error parsing number of epochs: {e}.\nReceived: {sys.argv[num_hidden_layers + 6]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
         batch_size = int(sys.argv[num_hidden_layers + 7])
-        print('batch:', batch_size)
+        # print('batch:', batch_size)
     except ValueError as e:
         print(f"Error parsing batch size: {e}.\nReceived: {sys.argv[num_hidden_layers + 7]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
         learn_rate = float(sys.argv[num_hidden_layers + 8])
-        print('learn', learn_rate)
+        # print('learn', learn_rate)
     except ValueError as e:
         print(f"Error parsing learning rate: {e}.\nReceived: {sys.argv[num_hidden_layers + 8]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
         feat_func = scaling_func(sys.argv[num_hidden_layers + 9])
-        print('feat:', feat_func)
+        # print('feat:', feat_func)
     except Exception as e:
         print(f"Error parsing feature scaling function: {e}.\nReceived: {sys.argv[num_hidden_layers + 9]}\n\nExample input: {example_input}")
         sys.exit()
@@ -294,6 +320,9 @@ def main():
     # instantiate model
     model = MLP(layers, actv_funcs, outer_func, loss, batch_size)
 
+    test_model = MLP([3] + hidden_layers + [num_classes], actv_funcs, outer_func, loss, batch_size)
+    test_model.forward(np.random.randn(3), 0)
+
     # training loop
     for e in range(epochs):
         print('pausing before training loop')
@@ -311,12 +340,12 @@ def main():
                 x = X_train[i]
                 y = y_train[i]
                 
-                model.forward(x, 1) # forward pass
+                model.forward(x, 0) # forward pass
 
                 # construct output array to pass thru backward pass
                 y_output = construct_label_array(y, num_classes)
 
-                model.backward(y_output, learn_rate, 1) # backward pass
+                model.backward(y_output, learn_rate, 0) # backward pass
 
 
 main()
