@@ -4,6 +4,11 @@ Emails: waltnertyler@gmail.com
         twaltner@u.rochester.edu
 
 
+# smax derivative func is broken
+
+# Memory Efficiency: By storing only prev_a on the way forward and discarding it effectively after the update, I avoid holding onto the final network output matrix in memory twice (once in the main loop for loss calculation, once inside the model object).
+
+
 Project Overview: Dynamic Multi-Layer Perceptron (MLP)
 - A fully custom, from-scratch Multi-Layer Perceptron (MLP) built in Python and NumPy to classify the FashionMNIST dataset. This project demonstrates the application of fundamentals I have learnt throughout my university courses of linear algebra, introduction to AI, and calculus. I purposely implemented this project without without relying on high-level machine learning frameworks so I can learn more about the topics first hand and build low-level memory optimizations from scratch.  
 Key Technical Achievements:

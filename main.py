@@ -129,6 +129,7 @@ class MLP:
         self.out_a_func, self.out_da_func, self.out_a_cache = outer_funcs 
         self.l_func, self.dl_func = loss
         self.batch_size = batch_size = batch_size
+        self.model_activations = []
         self.cache = []
 
         # arrays to store weights & biases
@@ -138,26 +139,28 @@ class MLP:
         for i in range(1, len(self.layers)):
             # print(i, layers[i])
             self.weights.append(np.random.randn(layers[i], layers[i - 1]))
-            if i != len(self.layers) - 1: # if not on last layer append to biases
-                self.biases.append(np.zeros(layers[i]))
-
+            self.biases.append(np.zeros(layers[i]))
+        
 
     def forward(self, prev_a: list[float], idx: int):
+        if idx == 0: # reset cache and model activations if on first pass
+            self.cache = []
+            self.model_activations = []
+
         # z = pre-activation value
         # a = activation
         # z = w * prev_a + b
         # cur_a = actv(z)
+        
+        self.model_activations.append(prev_a) # store prev_a
+
         w = self.weights[idx].T
         b = self.biases[idx]
-
-        print('idx', idx)
-        print('prev a', np.shape(prev_a))
-        print('w', np.shape(w))
-        print('b', np.shape(b))
         
         z = np.dot(prev_a, w) + b
+        cur_a = None
 
-        if idx != len(self.layers) - 2: # if not last pass
+        if idx != len(self.layers) - 1: # if not last pass
             if self.a_cache: # if caching
                 self.cache.append(z) # cache z
         
@@ -171,37 +174,76 @@ class MLP:
 
         idx += 1 # increment idx
 
-        if idx != len(self.layers) - 2: # if not on last pass, go deeper
+        if idx != len(self.layers) - 1: # if not on last pass, go deeper
+            print('pass ', idx)
             return self.forward(cur_a, idx)
         
         else: # if last pass
-            return cur_a # return output activation
+            print('pass ', idx)
+            self.model_activations.append(cur_a)
+            return cur_a
 
 
-    def backward(self, y, learning_rate: float, idx: int):
-        # Backprop through layers
-        # Chain Rule: 
-        # F'(g(x)) = F'(g(x)) * g'(x)
-        # z = w * a + b
+    def backward(self, grad_output, learning_rate: float, idx: int = 0):
+        # dC_db = C'(a(z(w))) * a'(z(w))  
+        # dC_dw = C'(a(z(w))) * a'(z(w)) * z'(w)
+        #                                  z'(w) = w * prev(a) + b
+        # dC_dw = C'(a(z(w))) * a'(z(w)) * prev(a)                                           
+        # Above is true UNLESS activation function destroys gradient and 
+        # requires caching. Then we use the pre-activation value, z, in 
+        # place for a(prev)
         
-        # can use dC/db to calculate dC_dw since:
-        # Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
-        # dC/db = C'(a(z(w))) * a'(z(w)) * 1
-        # dC/db = C'(a(z(w))) * a'(z(w))
-        # Change of Cost to Weights: C = cost (aka loss), a = activ, z = value before activation w = weight 
-        # dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
-        # dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
-        # dC/dw = dC/db * a(prev)
-        # calculate dC/db using element-wise mult 
-        
-        # backwards funciton needs to know which direction to decend, so we pass in dC/da(prev) to tell it
-        # dC/da(prev) = dC/da * da/dz * dz/da(prev)
-        #                               dz/da(prev) <= weights of cur layer (z = w * a + b)
-        # dC/da(prev) = dC/da * da/dz * w(cur)
-        # dC/da(prev) = dC/db * w(cur)
-        # reshape weights to 2d matrix of dimensions (neurons current layer, neurons previous layer)
+        true_idx = -(idx + 1) 
 
-        return
+        if idx == 0: # if last layer
+            if self.out_a_cache: # if cached output layer
+                da_dz = self.out_da_func(self.cache[true_idx])
+
+            else: # if didn't cache output layer, use current layer activations 
+                da_dz = self.out_da_func(self.model_activations[true_idx])
+
+        else:
+            if self.a_cache: # if not last layer
+                da_dz = self.da_func(self.cache[true_idx])
+
+            else: # if didn't cache layer, use current layer activations
+                da_dz = self.da_func(self.model_activations[true_idx])
+
+        # dC/dz = dC/da * da/dz
+        # dC/dz = grad_output * deriv_activation_func (or cached z-calue)
+        dC_dz = grad_output * da_dz
+
+        # dC/dw = dC/da * da/dz * dz/dw
+        # dC/dw = dC/dz * dz/dw
+        #                 prev_a = prev_a(w)/dw * b/dw
+        # dC/dw = dC/dz * prev_a
+        prev_a = self.model_activations[true_idx - 1]
+        dC_dw = np.dot(prev_a.T, dC_dz)
+        
+        # dC/db = dC/da * da/dz * dz/db
+        # dC/db = dC/dz * dz/db
+        #                 1 = prev_a(w)/db * b/db
+        # dC/db = dC/dz
+        dC_db = np.mean(dC_dz, axis=0)
+
+        # dC/da = dC/da * da/da * dz/da
+        # dC/da = dC/da * dz/da
+        #                 cur_w = prev_a(cur_w)/da + b/da
+        # dC/da = grad_output * cur_w
+        prev_grad_output = np.dot(grad_output, self.weights[true_idx])
+
+        # update weights & biases
+        self.weights[true_idx] -= (dC_dw * learning_rate).T
+        self.biases[true_idx] -= (dC_db * learning_rate).T
+
+        idx += 1 # increment idx
+
+        if idx != len(self.layers) - 1: # if not on last pass, go deeper
+            return self.backward(prev_grad_output, learning_rate, idx)
+        
+        else: # if last pass
+            return True
+        
 
 # handle commandline input, organize information of model
 def take_input():
@@ -291,9 +333,13 @@ def take_input():
 
 
 # returns "true" output layer to be compared to predicted
-def construct_label_array(y_label: int, output_size: int): 
-    label_arr = np.zeros(output_size)
-    label_arr[y_label] = 1
+def construct_label_array(y_labels: int, num_classes: int): 
+    label_arr = []
+    for label in y_labels:
+        row = np.zeros(num_classes)
+        row[label] = 1
+        label_arr.append(row)
+
     return label_arr
 
 
@@ -320,8 +366,10 @@ def main():
     # instantiate model
     model = MLP(layers, actv_funcs, outer_func, loss, batch_size)
 
-    test_model = MLP([3] + hidden_layers + [num_classes], actv_funcs, outer_func, loss, batch_size)
-    test_model.forward(np.random.randn(3), 0)
+    y_hat = model.forward(X_train[0: 64], 0)
+    y = construct_label_array(y_train[0:64], num_classes)
+    output_gradient = model.dl_func(y, y_hat)
+    print('backward pass complete', model.backward(output_gradient, 0.1, 0))
 
     # training loop
     for e in range(epochs):
