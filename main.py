@@ -137,7 +137,6 @@ class MLP:
         self.biases = []
 
         for i in range(1, len(self.layers)):
-            # print(i, layers[i])
             self.weights.append(np.random.randn(layers[i], layers[i - 1]))
             self.biases.append(np.zeros(layers[i]))
         
@@ -175,11 +174,9 @@ class MLP:
         idx += 1 # increment idx
 
         if idx != len(self.layers) - 1: # if not on last pass, go deeper
-            print('pass ', idx)
             return self.forward(cur_a, idx)
         
         else: # if last pass
-            print('pass ', idx)
             self.model_activations.append(cur_a)
             return cur_a
 
@@ -366,34 +363,34 @@ def main():
     # instantiate model
     model = MLP(layers, actv_funcs, outer_func, loss, batch_size)
 
-    y_hat = model.forward(X_train[0: 64], 0)
-    y = construct_label_array(y_train[0:64], num_classes)
-    output_gradient = model.dl_func(y, y_hat)
-    print('backward pass complete', model.backward(output_gradient, 0.1, 0))
-
     # training loop
     for e in range(epochs):
-        print('pausing before training loop')
-        return 
         # shuffle idx array in-place with np.random.shuffle() each epoch
         np.random.shuffle(idx)
     
         # iterates thru entire dataset using interval batch_size
-        for k in range(0, len(X_train), batch_size):
-            batch_idx = idx[k: k + batch_size]
+        for b in range(0, len(X_train), batch_size):
+            batch_idx = idx[b: b + batch_size]
+        
+            x = []
+            y = []
+            # construct x & y arrays of batch
+            for k in batch_idx:
+                x.append(X_train[k])
+                y.append(y_train[k])        
+            
+            # forward pass
+            y_hat = model.forward(X_train[0: 64], 0)
 
-            # iterate thru batch
-            for i in batch_idx:
-                # grab inputs and appropriate labels
-                x = X_train[i]
-                y = y_train[i]
-                
-                model.forward(x, 0) # forward pass
+            # construct correct label array for batch
+            y = construct_label_array(y_train[0:64], num_classes)
 
-                # construct output array to pass thru backward pass
-                y_output = construct_label_array(y, num_classes)
+            # calculate output gradient via loss
+            output_gradient = model.dl_func(y, y_hat)
 
-                model.backward(y_output, learn_rate, 0) # backward pass
+            # perform backwards pass
+            print(f'backward pass {b} complete', model.backward(output_gradient, 0.1, 0))
+
 
 
 main()
