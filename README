@@ -1,12 +1,34 @@
 Author: Tyler Waltner 
-Date: Aug 27th, 2026
+Date: Sep 7th, 2026
 Emails: waltnertyler@gmail.com
         twaltner@u.rochester.edu
+
+# deconstruct label array method to generate model's prediction array
+
+# F1 score for mutiple classes was interesting asI had to average all f1 scores for all of the classes to get a macro f1 score
+
+# self.cached_idx variable to enable smart caching and make sure that we dont cache layers that don t need caching to asave memory
 
 
 # smax derivative func is broken
 
 # Memory Efficiency: By storing only prev_a on the way forward and discarding it effectively after the update, I avoid holding onto the final network output matrix in memory twice (once in the main loop for loss calculation, once inside the model object).
+
+# for portfolio js do case study of applying this flexible program to multiple types of datasets and see the accuracy i can achieve?
+# add nasa pod app to github aswell, add gif to javascript game update readmes?
+
+# implement He initialization
+
+# method to save model
+# F1 score
+# find out why loss inst decreasing
+
+- add outer layer different activation function from hidden layers, add so can be specified? implement in forward / backward pass special case for last passes
+- create training loop to pass data in batches
+- another paramter to specify if we are training or testing dataset, dont load datasets if train or test or if no model saved cant test
+- make ability to save model in txt file to not lose progress
+- implement performance method to track F1 & loss over time
+- implement bce & focal loss funcs & derivs
 
 
 Project Overview: Dynamic Multi-Layer Perceptron (MLP)
@@ -42,7 +64,6 @@ to use as our samples for our batch each epoch.
 AI Use:
 AI was used primarily used only for undestanding concepts and minor bug fixing. It was mainly consulted for the architecture of how I should implement my MLP in an 1D setting as well as to help me wrap my head around the conceptual side of ML. i.e. Hidden Layer Architecture, the calculus of the Forward/Backward Pass, test v.s. training sets, performance measuring utilizing F1 & loss, softmax, etc.
 
-
 Misc Notes for self:
 - Dynamic Command-Line Args to specify model 
 - Model weights and biases stored in 1D array
@@ -57,15 +78,6 @@ Misc Notes for self:
     dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
     dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
     dC/dw = dC/db * a(prev)
-
-
-TODO for ver. 2 batching implementation: 
-- add outer layer different activation function from hidden layers, add so can be specified? implement in forward / backward pass special case for last passes
-- create training loop to pass data in batches
-- another paramter to specify if we are training or testing dataset, dont load datasets if train or test or if no model saved cant test
-- make ability to save model in txt file to not lose progress
-- implement performance method to track F1 & loss over time
-- implement bce & focal loss funcs & derivs
 
 
 Prev Changes: 

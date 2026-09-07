@@ -4,7 +4,6 @@
 #         twaltner@u.rochester.edu
 
 import numpy as np
-import random
 import sys
 import mnist_reader
 
@@ -30,6 +29,8 @@ def activation_func(func: str):
 
     if f == 'sig' or f == 'sigmoid':
         def sigmoid(vector):
+            # prevent overflow by clipping extreme values
+            vector = np.clip(vector, -500, 500)
             return 1 / (1 + np.exp(-vector))
         def deriv_sigmoid(prev_sig): 
             # forward pass calculated our sigmoid values, so when we input we can use it to calculate derivative of sig(x) which = (1 - sig(x)) * sig(x)
@@ -56,18 +57,9 @@ def activation_func(func: str):
         def deriv_relu(vector):
             return np.where(vector > 0, 1, 0.01) # where vector > 0, assign value to 1, else = 0
         return leaky_relu, deriv_relu, True # relu need to cache due to destroying gradients when value is < 0
-    
-    elif f == 'smax': # soft max
-        def soft_max(vector):
-            e_exp = np.exp(vector)
-            return e_exp / np.sum(e_exp)
-        def deriv_soft_max(prev_smax):
-            # deriv of softmax is jacobian
-            return np.diag(prev_smax) - np.outer(prev_smax, prev_smax)
-        return soft_max, deriv_soft_max, True
 
     else:
-        raise TypeError("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky ReLU, tanh for Tanh, smax for Soft Max)")
+        raise TypeError("invalid input for activation func, please input either one of the following in the command line args for activation func:\nsig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky ReLU, tanh for Tanh)")
 
 
 # returns tuple of loss func as well as derivative to be passed into MLP
@@ -78,14 +70,14 @@ def loss_func(func: str):
         def mean_sq_err(y: list[float], y_hat: list[float]):
             return float(np.mean((y_hat - y) ** 2))
         def deriv_mean_sq_err(y: list[float], y_hat: list[float]):
-            return (2 / len(y)) * (y_hat - y)
+            return (2 / (len(y) * len(y[0]))) * (y_hat - y) 
         return mean_sq_err, deriv_mean_sq_err
     
     elif func == "mae":
         def mean_abs_err(y: list[float], y_hat: list[float]):
             return float(np.mean(np.abs(y - y_hat)))
         def deriv_mean_abs_err(y: list[float], y_hat: list[float]):
-            return np.sign(y - y_hat) / len(y)
+            return np.sign(y_hat - y) / (len(y) * len(y[0]))
         return mean_abs_err, deriv_mean_abs_err
         
     elif func == "bce":
@@ -131,6 +123,7 @@ class MLP:
         self.batch_size = batch_size = batch_size
         self.model_activations = []
         self.cache = []
+        self.cache_idx = None
 
         # arrays to store weights & biases
         self.weights = [] 
@@ -159,7 +152,7 @@ class MLP:
         z = np.dot(prev_a, w) + b
         cur_a = None
 
-        if idx != len(self.layers) - 1: # if not last pass
+        if idx != len(self.layers) - 2: # if not last pass
             if self.a_cache: # if caching
                 self.cache.append(z) # cache z
         
@@ -189,19 +182,24 @@ class MLP:
         # Above is true UNLESS activation function destroys gradient and 
         # requires caching. Then we use the pre-activation value, z, in 
         # place for a(prev)
+
+        if idx == 0: # if first pass, reset cached idx
+            self.cache_idx = -1 
         
-        true_idx = -(idx + 1) 
+        true_idx = -(idx + 1) # retrieve true idx
 
         if idx == 0: # if last layer
             if self.out_a_cache: # if cached output layer
-                da_dz = self.out_da_func(self.cache[true_idx])
+                da_dz = self.out_da_func(self.cache[self.cache_idx])
+                self.cache_idx -= 1
 
             else: # if didn't cache output layer, use current layer activations 
                 da_dz = self.out_da_func(self.model_activations[true_idx])
 
-        else:
-            if self.a_cache: # if not last layer
-                da_dz = self.da_func(self.cache[true_idx])
+        else: # if not last layer
+            if self.a_cache: # if cached inner layer
+                da_dz = self.da_func(self.cache[self.cache_idx])
+                self.cache_idx -= 1
 
             else: # if didn't cache layer, use current layer activations
                 da_dz = self.da_func(self.model_activations[true_idx])
@@ -221,13 +219,13 @@ class MLP:
         # dC/db = dC/dz * dz/db
         #                 1 = prev_a(w)/db * b/db
         # dC/db = dC/dz
-        dC_db = np.mean(dC_dz, axis=0)
+        dC_db = np.sum(dC_dz, axis=0)
 
-        # dC/da = dC/da * da/da * dz/da
-        # dC/da = dC/da * dz/da
+        # dC/da = dC/da * da/dz * dz/da
+        # dC/da = dC/dz * dz/da
         #                 cur_w = prev_a(cur_w)/da + b/da
-        # dC/da = grad_output * cur_w
-        prev_grad_output = np.dot(grad_output, self.weights[true_idx])
+        # dC/da = dC/dz * cur_w
+        prev_grad_output = np.dot(dC_dz, self.weights[true_idx])
 
         # update weights & biases
         self.weights[true_idx] -= (dC_dw * learning_rate).T
@@ -244,18 +242,18 @@ class MLP:
 
 # handle commandline input, organize information of model
 def take_input():
-    example_input = "python3 main.py data/fashion 128 16 10 sig smax mse 100 64 0.1 norm\n" \
+    example_input = "python3 main.py data/fashion 128 16 10 sig tanh mse 100 64 0.1 norm\n" \
                     "dataset: data/fashion\n" \
                     "hidden layers: 128, 16\n" \
                     "num classes: 10\n" \
-                    "inner activation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\n" \
+                    "inner activation func: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, tanh for Tanh)\n" \
+                    "outer activation func: tanh (same as above...)\n" \
                     "loss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\n" \
-                    "outer activation func: smax (same as above...)\n" \
-                    "loss: mse (mse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss)" \
+                    "loss: mse (mse for Mean Squared Error, mae for Mean Absolute Error, bce for Binary Cross Entropy fl for Focal Loss)\n" \
                     "epochs: 100\n" \
                     "batch size: 64\n" \
                     "learning rate: 0.1\n" \
-                    "feature scaling: norm (norm for Normalization, stdz for Standardization)"
+                    "feature scaling: norm (norm for Normalization, stdz for Standardization)\n"
 
     num_hidden_layers = max(0, len(sys.argv) - 10) # can't have num_hidden_layers be negative
     
@@ -330,8 +328,9 @@ def take_input():
 
 
 # returns "true" output layer to be compared to predicted
-def construct_label_array(y_labels: int, num_classes: int): 
+def construct_label_array(y_labels: np.ndarray, num_classes: int): 
     label_arr = []
+
     for label in y_labels:
         row = np.zeros(num_classes)
         row[label] = 1
@@ -339,6 +338,69 @@ def construct_label_array(y_labels: int, num_classes: int):
 
     return label_arr
 
+
+# converts output layer matrix shape(Batch, N(output)) into single digit guesses of the overall model based on 'brightest' neuron shape(Batch)
+def deconstruct_label_array(label_arr: np.ndarray):
+    # generates matrix of T/F if item is row max or not, then converts from T/F matrix to 1/0 
+    label_arr_converted = (label_arr == label_arr.max(axis=1, keepdims=True)).astype(int) 
+    
+    y_labels = []
+
+    # [0, 0, 1] -> [2]    
+    for row in label_arr_converted: # iterate thru array
+        for i, label in enumerate(row): # iterate thru rows 
+            if label == 1: # if value is 1, (model's guess) append to array the model's guess, then break for the inner loop and move onto next row
+                y_labels.append(i)
+                break
+    
+    return y_labels
+
+
+# calculates macro f1 score
+def macro_f_score(y_array: np.ndarry, y_hat_array: list[int], num_classes: int): 
+    # Confusion Matrix:
+    #     [P]  [N] Pos/Neg = model guesses if that 
+    # [T] TP | TN  True = actually that
+    # [F] FP | FN  False = not that
+    
+    f1_scores_array = []
+
+    # Take f1 score for all 10 classes, then avg them
+    for i in range(num_classes):
+        # reset confusion matrix counters 
+        tp_count, fp_count, fn_count = 0, 0, 0
+        
+         
+        for y, y_hat in zip(y_array, y_hat_array):
+            if y == i: 
+                if y_hat == i: # if True Positive
+                    tp_count += 1
+                else: # if False Positive
+                    fp_count += 1
+            elif y_hat == i: # if False Negative
+                fn_count += 1
+
+        # precision = TP / (TP + FP)   
+        # "Out of all of our positive predictions, how many were actually correct?"   
+        p = tp_count / (tp_count + fp_count + 1e-9) # avoid division by 0
+
+        # recall = TP / (TP + FN)
+        # "How accurately did we predict when data was positive"
+        r = tp_count / (tp_count + fn_count + 1e-9) # avoid division by 0
+
+        # F1 = 2 x (Presicion x Recall) / (Precision + Recall)
+        if p + r == 0: # avoid division by 0
+            f1 = 0
+        else:
+            f1 = 2 * (p * r) / (p + r + 0.01) 
+
+        # append f1
+        f1_scores_array.append(f1)
+
+    macro_f1 = np.mean(f1_scores_array)
+    
+    return macro_f1
+    
 
 def main():
     # handle command line args
@@ -367,7 +429,7 @@ def main():
     for e in range(epochs):
         # shuffle idx array in-place with np.random.shuffle() each epoch
         np.random.shuffle(idx)
-    
+
         # iterates thru entire dataset using interval batch_size
         for b in range(0, len(X_train), batch_size):
             batch_idx = idx[b: b + batch_size]
@@ -379,18 +441,31 @@ def main():
                 x.append(X_train[k])
                 y.append(y_train[k])        
             
-            # forward pass
-            y_hat = model.forward(X_train[0: 64], 0)
+            # convert inputs to np array
+            x_np = np.array(x)
+
+            # forward pass (returns output layer activations, aka model predictions)
+            y_hat = model.forward(x_np, 0)
+
+            # compress each of the output activations into one guess (most activated node) returns array of ints length num_classes
+            y_hat_guesses = deconstruct_label_array(y_hat) 
 
             # construct correct label array for batch
-            y = construct_label_array(y_train[0:64], num_classes)
+            y_array = construct_label_array(y, num_classes)
 
             # calculate output gradient via loss
-            output_gradient = model.dl_func(y, y_hat)
+            output_gradient = model.dl_func(y_array, y_hat)
 
             # perform backwards pass
-            print(f'backward pass {b} complete', model.backward(output_gradient, 0.1, 0))
+            success = model.backward(output_gradient, 0.1, 0)
 
+            # calculate loss
+            loss = model.l_func(y_array, y_hat)
+
+            # calculate F1
+            macro_f1 = macro_f_score(y, y_hat_guesses, num_classes)
+
+            print(f'Epoch: {e + 1:03}, Batch: {b // batch_size + 1:03}, Loss: {loss:.4f}, Macro F1: {macro_f1:.4f}, Batch Success: {success}')
 
 
 main()
