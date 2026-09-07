@@ -70,7 +70,7 @@ def loss_func(func: str):
         def mean_sq_err(y: list[float], y_hat: list[float]):
             return float(np.mean((y_hat - y) ** 2))
         def deriv_mean_sq_err(y: list[float], y_hat: list[float]):
-            return (2 / (len(y) * len(y[0]))) * (y_hat - y) 
+            return (2 / (len(y) * len(y[0]))) * (y_hat - np.array(y)) 
         return mean_sq_err, deriv_mean_sq_err
     
     elif func == "mae":
@@ -120,7 +120,7 @@ class MLP:
         self.a_func, self.da_func, self.a_cache = actv_funcs # self.cache is boolean of if we cache for this function or not
         self.out_a_func, self.out_da_func, self.out_a_cache = outer_funcs 
         self.l_func, self.dl_func = loss
-        self.batch_size = batch_size = batch_size
+        self.batch_size = batch_size
         self.model_activations = []
         self.cache = []
         self.cache_idx = None
@@ -283,14 +283,14 @@ def take_input():
         sys.exit()
 
     try:
-        outer_func = activation_func(sys.argv[num_hidden_layers + 4].lower())
+        outer_funcs = activation_func(sys.argv[num_hidden_layers + 4].lower())
         # print('outer', outer_func)
     except Exception as e:
         print(f"Error parsing activation function for outer layers: {e}.\nReceived: {sys.argv[num_hidden_layers + 4]}\n\nExample input: {example_input}")
         sys.exit()
 
     try:
-        loss = loss_func(sys.argv[num_hidden_layers + 5].lower())
+        loss_funcs = loss_func(sys.argv[num_hidden_layers + 5].lower())
         # print('loss', loss)
     except Exception as e:
         print(f"Error parsing loss function: {e}.\nReceived: {sys.argv[num_hidden_layers + 5]}\n\nExample input: {example_input}")
@@ -324,7 +324,7 @@ def take_input():
         print(f"Error parsing feature scaling function: {e}.\nReceived: {sys.argv[num_hidden_layers + 9]}\n\nExample input: {example_input}")
         sys.exit()
 
-    return data_path, hidden_layers, num_classes, actv_funcs, outer_func, loss, epochs, batch_size, learn_rate, feat_func
+    return data_path, hidden_layers, num_classes, actv_funcs, outer_funcs, loss_funcs, epochs, batch_size, learn_rate, feat_func
 
 
 # returns "true" output layer to be compared to predicted
@@ -357,7 +357,7 @@ def deconstruct_label_array(label_arr: np.ndarray):
 
 
 # calculates macro f1 score
-def macro_f_score(y_array: np.ndarry, y_hat_array: list[int], num_classes: int): 
+def macro_f_score(y_array: np.ndarray, y_hat_array: list[int], num_classes: int): 
     # Confusion Matrix:
     #     [P]  [N] Pos/Neg = model guesses class
     # [T] TP | TN  True = y is same class
@@ -390,7 +390,7 @@ def macro_f_score(y_array: np.ndarry, y_hat_array: list[int], num_classes: int):
         if p + r == 0: # avoid division by 0
             f1 = 0
         else:
-            f1 = 2 * (p * r) / (p + r + 0.01) 
+            f1 = 2 * (p * r) / (p + r) 
 
         # append f1
         f1_scores_array.append(f1)
@@ -402,7 +402,7 @@ def macro_f_score(y_array: np.ndarry, y_hat_array: list[int], num_classes: int):
 
 def main():
     # handle command line args
-    data_path, hidden_layers, num_classes, actv_funcs, outer_func, loss, epochs, batch_size, learn_rate, feat_func = take_input()
+    data_path, hidden_layers, num_classes, actv_funcs, outer_funcs, loss_funcs, epochs, batch_size, learn_rate, feat_func = take_input()
 
     # load data
     X_train, y_train = mnist_reader.load_mnist(data_path, kind='train')
@@ -421,7 +421,7 @@ def main():
     layers = [input_size] + hidden_layers + [num_classes]
 
     # instantiate model
-    model = MLP(layers, actv_funcs, outer_func, loss, batch_size)
+    model = MLP(layers, actv_funcs, outer_funcs, loss_funcs, batch_size)
 
     # training loop
     for e in range(epochs):
@@ -458,7 +458,7 @@ def main():
             success = model.backward(output_gradient, learn_rate, 0)
 
             # calculate loss
-            loss = model.l_func(y_array, y_hat)
+            loss = loss_funcs[0](y_array, y_hat)
 
             # calculate F1
             macro_f1 = macro_f_score(y, y_hat_guesses, num_classes)

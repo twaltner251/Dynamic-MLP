@@ -2,7 +2,7 @@ Author: Tyler Waltner
 Date: Sep 7th, 2026
 Emails: waltnertyler@gmail.com
         twaltner@u.rochester.edu
-
+# implement binary_cross_entropy and focal_loss functions
 # deconstruct label array method to generate model's prediction array
 
 # F1 score for mutiple classes was interesting asI had to average all f1 scores for all of the classes to get a macro f1 score
