@@ -359,34 +359,32 @@ def deconstruct_label_array(label_arr: np.ndarray):
 # calculates macro f1 score
 def macro_f_score(y_array: np.ndarry, y_hat_array: list[int], num_classes: int): 
     # Confusion Matrix:
-    #     [P]  [N] Pos/Neg = model guesses if that 
-    # [T] TP | TN  True = actually that
-    # [F] FP | FN  False = not that
+    #     [P]  [N] Pos/Neg = model guesses class
+    # [T] TP | TN  True = y is same class
+    # [F] FP | FN  False = y is not same class
+
+    y_array = np.array(y_array)
+    y_hat_array = np.array(y_hat_array)
     
     f1_scores_array = []
 
     # Take f1 score for all 10 classes, then avg them
     for i in range(num_classes):
-        # reset confusion matrix counters 
-        tp_count, fp_count, fn_count = 0, 0, 0
-        
-         
-        for y, y_hat in zip(y_array, y_hat_array):
-            if y == i: 
-                if y_hat == i: # if True Positive
-                    tp_count += 1
-                else: # if False Positive
-                    fp_count += 1
-            elif y_hat == i: # if False Negative
-                fn_count += 1
+        # mask into boolean arrays
+        actual_pos = (y_array == i)
+        predicted_pos = (y_hat_array == i)
+
+        tp = np.sum(actual_pos & predicted_pos)
+        fp = np.sum(~actual_pos & predicted_pos)
+        fn = np.sum(actual_pos & ~predicted_pos)
 
         # precision = TP / (TP + FP)   
         # "Out of all of our positive predictions, how many were actually correct?"   
-        p = tp_count / (tp_count + fp_count + 1e-9) # avoid division by 0
+        p = tp / (tp + fp + 1e-9) # avoid division by 0
 
         # recall = TP / (TP + FN)
         # "How accurately did we predict when data was positive"
-        r = tp_count / (tp_count + fn_count + 1e-9) # avoid division by 0
+        r = tp / (tp + fn + 1e-9) # avoid division by 0
 
         # F1 = 2 x (Presicion x Recall) / (Precision + Recall)
         if p + r == 0: # avoid division by 0
@@ -457,7 +455,7 @@ def main():
             output_gradient = model.dl_func(y_array, y_hat)
 
             # perform backwards pass
-            success = model.backward(output_gradient, 0.1, 0)
+            success = model.backward(output_gradient, learn_rate, 0)
 
             # calculate loss
             loss = model.l_func(y_array, y_hat)

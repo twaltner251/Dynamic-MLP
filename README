@@ -6,6 +6,7 @@ Emails: waltnertyler@gmail.com
 # deconstruct label array method to generate model's prediction array
 
 # F1 score for mutiple classes was interesting asI had to average all f1 scores for all of the classes to get a macro f1 score
+# converted f1 score to use np vectorization for optimization remov for loops
 
 # self.cached_idx variable to enable smart caching and make sure that we dont cache layers that don t need caching to asave memory
 
