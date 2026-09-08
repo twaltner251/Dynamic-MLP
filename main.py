@@ -138,7 +138,7 @@ class MLP:
 
         else: # populate weights and biases randomly
             for i in range(len(self.layers) - 1):
-                self.weights.append(np.random.randn(layers[i + 1], layers[i]))
+                self.weights.append(np.random.randn(layers[i + 1], layers[i]) * np.sqrt(2 / layers[i])) # He initialization
                 self.biases.append(np.zeros(layers[i + 1]))
                 # print(np.shape(self.weights[i]), np.shape(self.biases[i]))
         
@@ -455,6 +455,7 @@ def main():
         # instantiate model
         model = MLP(layers, actv_funcs, outer_funcs, loss_funcs, batch_size, False)
 
+    macro_f1 = 0
     # training loop
     for e in range(epochs):
         # shuffle idx array in-place with np.random.shuffle() each epoch
@@ -492,10 +493,12 @@ def main():
             # calculate loss
             loss = loss_funcs[0](y_array, y_hat)
 
-            # calculate F1
-            macro_f1 = macro_f_score(y, y_hat_guesses, num_classes)
-
             print(f'Epoch: {e + 1:03}, Batch: {b // batch_size + 1:03}, Loss: {loss:.4f}, Macro F1: {macro_f1:.4f}, Batch Success: {success}')
+
+        # calculate F1
+        macro_f1 = macro_f_score(y, y_hat_guesses, num_classes)
+
+        
 
 
     # save model after training loop

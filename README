@@ -3,6 +3,7 @@ Date: Sep 7th, 2026
 Emails: waltnertyler@gmail.com
         twaltner@u.rochester.edu
 # added additional inquiry about loading from previous saves
+# added He initilalization
 # added new param to model, wb_dict, if false then dont load from prev saves, if it exists, then we load from prev save
 # check if layers shape is same as prev model before loading, exit if not display saved model shape
 
