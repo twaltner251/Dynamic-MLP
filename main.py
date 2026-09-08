@@ -3,6 +3,7 @@
 # Emails: waltnertyler@gmail.com
 #         twaltner@u.rochester.edu
 
+import os
 import numpy as np
 import sys
 import mnist_reader
@@ -115,7 +116,7 @@ def scaling_func(func: str):
 
 
 class MLP:
-    def __init__(self, layers, actv_funcs, outer_funcs, loss, batch_size):
+    def __init__(self, layers, actv_funcs, outer_funcs, loss, batch_size, wb_dict):
         self.layers = layers # input + hidden + output layer #'s in array
         self.a_func, self.da_func, self.a_cache = actv_funcs # self.cache is boolean of if we cache for this function or not
         self.out_a_func, self.out_da_func, self.out_a_cache = outer_funcs 
@@ -129,9 +130,17 @@ class MLP:
         self.weights = [] 
         self.biases = []
 
-        for i in range(1, len(self.layers)):
-            self.weights.append(np.random.randn(layers[i], layers[i - 1]))
-            self.biases.append(np.zeros(layers[i]))
+        if wb_dict: # if loading from previous model
+            for i in range(len(layers) - 1): # load weights and biases from previous model
+                self.weights.append(wb_dict[f'layer_{i}_weights'])
+                self.biases.append(wb_dict[f'layer_{i}_biases'])
+                # print(np.shape(self.weights[i]), np.shape(self.biases[i]))
+
+        else: # populate weights and biases randomly
+            for i in range(len(self.layers) - 1):
+                self.weights.append(np.random.randn(layers[i + 1], layers[i]))
+                self.biases.append(np.zeros(layers[i + 1]))
+                # print(np.shape(self.weights[i]), np.shape(self.biases[i]))
         
 
     def forward(self, prev_a: list[float], idx: int):
@@ -420,8 +429,33 @@ def main():
     # construct layer count to be passed into MLP
     layers = [input_size] + hidden_layers + [num_classes]
 
-    # instantiate model
-    model = MLP(layers, actv_funcs, outer_funcs, loss_funcs, batch_size)
+    # check with user if loading from previous save
+    load = ''
+    while load.lower() not in ['y', 'n']:
+        load = input('Would you like to load from an previous save? Please enter either "y" for yes or "n" for no: ')
+    
+    if load == 'y':
+        while True:
+            save_path = input('Please enter filepath of model: ')
+
+            if save_path[-4:] == '.npz' and os.path.exists(save_path): 
+                # if filepath exists and is .npz file, load saved model
+                wb_dict = np.load(save_path)
+
+                if not np.array_equal(wb_dict['layers'], layers):
+                    print(f'Layer shape mismatch between saved model and current model specified via command line.\nSaved model shape: {wb_dict['layers']}')
+                    return
+
+                break
+        
+        # instantiate model
+        model = MLP(layers, actv_funcs, outer_funcs, loss_funcs, batch_size, wb_dict)
+
+    else:
+        # instantiate model
+        model = MLP(layers, actv_funcs, outer_funcs, loss_funcs, batch_size, False)
+
+    return
 
     # training loop
     for e in range(epochs):
@@ -491,7 +525,7 @@ def main():
             model_wb[f'layer_{idx}_biases'] = b
             idx += 1
         
-        np.savez(name, model_wb)
+        np.savez(name, **model_wb)
         print(f'Model successfuly saved to {name}.npz')
 
 
