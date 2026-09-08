@@ -436,7 +436,7 @@ def main():
     
     if load == 'y':
         while True:
-            save_path = input('Please enter filepath of model: ')
+            save_path = input('Please enter valid filepath of model. (Ex: "model.npz"): ')
 
             if save_path[-4:] == '.npz' and os.path.exists(save_path): 
                 # if filepath exists and is .npz file, load saved model
