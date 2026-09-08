@@ -1,142 +1,87 @@
-Author: Tyler Waltner 
-Date: Sep 7th, 2026
-Emails: waltnertyler@gmail.com
-        twaltner@u.rochester.edu
-# added additional inquiry about loading from previous saves
-# added He initilalization
-# added new param to model, wb_dict, if false then dont load from prev saves, if it exists, then we load from prev save
-# check if layers shape is same as prev model before loading, exit if not display saved model shape
+#### Date: September 8th, 2026
+#### Contact: waltnertyler@gmail.com | twaltner@u.rochester.edu
 
-# implement binary_cross_entropy and focal_loss functions
-# handled saving of model with ease user can specify name via command line (dynamic has loops so can handle inputs until valid input is reached)
+# Dynamic Minibatch MLP from Scratch!
 
-# deconstruct label array method to generate model's prediction array
+## Demo: 🎆
+<img src="demo.gif" alt="Demo GIF" width="800">
 
-# F1 score for mutiple classes was interesting asI had to average all f1 scores for all of the classes to get a macro f1 score
-# converted f1 score to use np vectorization for optimization remov for loops
+## Project Overview:
 
-# self.cached_idx variable to enable smart caching and make sure that we dont cache layers that don t need caching to asave memory
+A fully custom, from-scratch Multi-Layer Perceptron (MLP) engineered in Python and NumPy to classify the FashionMNIST dataset.
 
+Sparked by my Intro to AI course (CSC 242) in Spring 2026, my curiosity for neural networks drove me to look under the hood. Rather than relying on the abstractions of high-level frameworks like PyTorch or TensorFlow, I chose to build this model using minimal external dependencies. This hands-on approach allowed me to deeply absorb the underlying concepts, prioritizing low-level memory optimization, algorithmic efficiency, and a first-hand mathematical implementation of core deep learning mechanics.
 
-# smax derivative func is broken
+---
+## Key Engineering & Technical Achievements:
 
-# Memory Efficiency: By storing only prev_a on the way forward and discarding it effectively after the update, I avoid holding onto the final network output matrix in memory twice (once in the main loop for loss calculation, once inside the model object).
+**Systems-Level Memory & Architecture Optimization**
 
-# for portfolio js do case study of applying this flexible program to multiple types of datasets and see the accuracy i can achieve?
-# add nasa pod app to github aswell, add gif to javascript game update readmes?
+* **Smart State Caching:** Optimized RAM usage by building a custom activation handler that only caches pre-activation values ($z$) for functions that destroy gradients (like ReLU and LeakyReLU).
+* **Lightweight Data Shuffling:** Sped up batch sampling by shuffling a lightweight index array (`np.arange`) each epoch instead of copying large, heavy data arrays in memory.
+* **He Weight Initialization:** Implemented He weight initialization to prevent vanishing or exploding gradients, which helped stabilize training across deeper networks.
+* **Custom Evaluation Metrics:** Wrote a custom Macro F1 score calculator from scratch to get a more accurate read on multi-class predictions, rather than relying solely on loss.
+* **Modular Architecture:** Designed the network to easily swap out different activation functions (Sigmoid, Tanh, ReLU, LeakyReLU) and loss functions (MSE, MAE).
+* **CLI Configuration:** Set up a command-line interface to easily configure hyperparameters on the fly, including batch size, learning rate, and feature scaling.
+* **State Persistence:** Added save/load functionality for weights and biases using `.npz` dictionaries so training can be paused, resumed, or deployed for inference without having to retrain.
+* **Data Pipeline:** Built feature scaling (normalization and standardization) directly into the pipeline to speed up model convergence.
 
-# implement He initialization
+**Algorithmic & Mathematical Implementation**
 
-# method to save model
-# F1 score
-# find out why loss inst decreasing
+* **Manual Backpropagation:** Wrote the forward and backward passes completely from scratch using raw NumPy matrix multiplication, manually applying chain-rule calculus and gradient descent.
+* **Optimized Calculus:** Streamlined backpropagation by computing the bias gradient ($\frac{\partial C}{\partial b}$) first, then reusing it to efficiently find the weight gradient ($\frac{\partial C}{\partial w}$) to avoid redundant math.
+* **Pure Vectorization:** Stripped out slow Python for-loops and replaced them with pure NumPy vectorization for calculating activation derivatives and Macro F1 scores, noticeably boosting execution speed.
+* **Reusable Skeleton:** Built the project to be highly adaptable; because of the dynamic hidden layers and configurable parameters, this architecture can be easily repurposed for classification tasks way beyond just fashionMNIST.
 
-- add outer layer different activation function from hidden layers, add so can be specified? implement in forward / backward pass special case for last passes
-- create training loop to pass data in batches
-- another paramter to specify if we are training or testing dataset, dont load datasets if train or test or if no model saved cant test
-- make ability to save model in txt file to not lose progress
-- implement performance method to track F1 & loss over time
-- implement bce & focal loss funcs & derivs
+---
 
-
-Project Overview: Dynamic Multi-Layer Perceptron (MLP)
-- A fully custom, from-scratch Multi-Layer Perceptron (MLP) built in Python and NumPy to classify the FashionMNIST dataset. This project demonstrates the application of fundamentals I have learnt throughout my university courses of linear algebra, introduction to AI, and calculus. I purposely implemented this project without without relying on high-level machine learning frameworks so I can learn more about the topics first hand and build low-level memory optimizations from scratch.  
-Key Technical Achievements:
-Memory-Optimized Architecture: 
-- Engineered a unique 1D array state system for weights and biases, avoiding NumPy's memory reallocation overhead by pre-allocating np.zeros arrays and modifying them in-place during recursive forward and backward passes.  
-Algorithmic Efficiency: 
-- Streamlined backpropagation calculus by calculating the gradient with respect to biases first, using it to efficiently derive the gradient with respect to weights to prevent redundant computations. Implemented a lightweight data shuffling algorithm using an index array to reduce memory consumption during batching.  
-Dynamic & Configurable: 
-- Highly flexible via command-line arguments, supporting dynamic hidden layer sizes, dynamic feature scaling (normalization/standardization), and interchangeable activation and loss functions.  
-Smart State Caching: 
-- Built a custom activation function handler that selectively caches pre-activation values only when required by functions that destroy gradients (e.g., ReLU), optimizing overall RAM usage.
-Custom, Input Error Pipeline:
-- Incorporated smooth error pipelining to isolate errors in user input
-
-Instructions for use:
-Please input dataset you would like to learn:\nhidden layer size(s), num classes, choice of activation func for hidden layers, activation func for outer layers, loss func, epochs, and learning rate\nEx: python3 main.py data/fashion 128 16 10 sig smax mse 100 0.1 norm\ndataset: data/fashion\nhidden layers: 128, 16\nnum classes: 10\nactivation funcs: sig (sig OR sigmoid for Sigmoid, relu for ReLU, leaky_relu for Leaky Relu, smax for Soft Max, tanh for Tanh)\nloss func: mse (mse for Mean Squared Error, bce for Binary Cross Entropy fl for Focal Loss)\nepochs: 100\nlearning rate: 0.1, norm for normalization
-
-Notable Challenges:
-- had to make sure to first create an np.zeros array that is the size for all hidden layers combined for self.model_activations in 
-order to modify arrays in-place. Initially when I implemented self.model_activations, I created an empty array and planned to append
-each activation layer individually to self.model_activations. HOWEVER, np arrays have immutable allocation of memory, so np.append 
-returns a different array than the original one. So for the sake of memory optimization, rather than appending to it, allocated 
-memory via creating np.zeros array of final array size, and created self.model_activations_idx variable to track idx when appending
-to self.model_array during forward pass.
-    - same thing for self.cached_z array!
-    - changed np arrays of self.model_activations and self.cached_z via index slicing rather than iterating thru individual elements
-- instead of using random.shuffle(dataset) to shuffle data, which creates an entirely new array, I make an lightweight array of indices
-from 0 to len(dataset) - 1, [0, 1, 2, 3, ... , 59999] and then random.shuffle that array to retrieve the first batch_size indexes of that array 
-to use as our samples for our batch each epoch.
-
-AI Use:
-AI was used primarily used only for undestanding concepts and minor bug fixing. It was mainly consulted for the architecture of how I should implement my MLP in an 1D setting as well as to help me wrap my head around the conceptual side of ML. i.e. Hidden Layer Architecture, the calculus of the Forward/Backward Pass, test v.s. training sets, performance measuring utilizing F1 & loss, softmax, etc.
-
-Misc Notes for self:
-- Dynamic Command-Line Args to specify model 
-- Model weights and biases stored in 1D array
-- Activation func method: accounts if simple activation func that is able to be undone, if not, we use caching to store previous z value.
-- Loss func method: takes in specified loss function via command line and outputs appropriate loss func & its derivative to be used in backwards pass and performance evaluation
-- Forward pass: implemented with recursion to go thru deeper each layer, and for loop for iterating thru each individual node in layer
-- Backward pass: implmented with recursion to propagate thru layers until reach very first hidden layer, used dC/db to calculate dC/dw instead of recalculating C'a(z(w)) * a'(z(w)) since: 
-    Change of Cost to biases: C = cost (aka loss), a = activ, z = value before activation b = bias
-    dC/db = C'(a(z(w))) * a'(z(w)) * 1
-    dC/db = C'(a(z(w))) * a'(z(w))
-    Change of Cost to Weights: C = cost (aka loss), a = activ, z = value before activation w = weight 
-    dC/dw = C'(a(z(w))) * a'(z(w)) * z'(w)
-    dC/dw = C'(a(z(w))) * a'(z(w)) * a(prev)
-    dC/dw = dC/db * a(prev)
+## Technologies Used: <img src="https://www.svgrepo.com/show/452091/python.svg" alt="Python" width="20" height="20"> <img src="https://www.svgrepo.com/show/373938/numpy.svg" alt="NumPy" width="20" height="20">
 
 
-Prev Changes: 
-July 8th:
-- added loss func parameter to command line and implemented loss_func() to return 3 diff loss functions, MSE, MAE, BCE, & Focal loss
-- working on implementing recursive backwards pass
-    * updated forward pass to save activations in list self.model_activations (np array) to be used in backwards pass calculation
-    * updated self.indices to include indices for self.model_activations
-    * created new instance variable, self.model_activations_idx to track which activation we are on throughout forward pass
-- adjusted print statements of forward pass to match backwards pass
-- deleted redundant variable for creating key values of self.indices
-- fixed bug with num_layers where I wasn't counting the output layer at self.indices["num_layers"]'s initialization so output layer's
-weights and biases weren't generated. Pretty easy fix, but integral to model function as previously my output layer activations weren't
-being calculated!
+* **Python 3**: Core application logic.
+* **NumPy**: Vectorized matrix operations, linear algebra, and optimized memory management.
+* **MNIST Reader**: Dataset intake and parsing.
 
-July 9th:
-- fixed error with implementation of self.indices where it didn't include first input layer in model.activations
-    * adjusted forward method to append input layer's activations to self.model_activations
-- adjusted activation_func method to output additional bool at end of tuple. Ex. output: (loss_func, deriv_loss_func, True)
-    * this boolean represents whether or not we need caching 
-    * adjusted forward method to include caching of z value in forward pass if self.cache is true
-        - adjusted self.__init__ to support caching by initiazlizing array self.cached_z_values IF self.cache == True, populated indexes along with
-        self.model_activations.
-        - cached_z does not need to store first layer so initializiation is np.sum(self.layers[1:]) (every layer except input layer)
-            * was able to recycle code for populating self.model_activations
-    * technically the math isnt exactly correct for a'(z(w)), but since their derivatives are linear transformations of original a, we can use current activations without calculating previous z value or caching z in forward pass
-    * we only cache for activation funcs that destroy the gradients (so we can't use the current activation as an cheap computational substitution) and/or are too computationally expensive to undo to retrieve the z value?
-- fixed implementation of activation funcs to vectorize np arrays to take in full vector at one time rather than individually iterate with for loops
-- changed activation functions to take in np layers and use native np functions
-- changed appending to activation and z arrays using index slicing not for loops, optimize? ask gemini to make sure its in place and not memory intensive mistake
+---
 
-July 10th:
-- backwards pass implemented successfully fixed vector math
-- reorganized readme
-- removed redundant .flatten() from backwards method for calculating element wise product of dC/db
-- fixed error of tanh derivative previous was 1 - np.exp(arr, 2) but this puts it to exponent of natural log constant 'e', simple fix, 
-just corrected to np.square(arr)
-- fixed error of relu derivative, previously was using np.clip which left values between 0-1 as is (Ex: if value was 0.5 method did not
-change) now use np.where(vector > 0, 1, 0) to correctly output 1 for any > 0 values and 0 for anything <= 0.
-- added option of leaky relu due to exploding gradients from testing 
-- added normalization / standardization methods for input data, added another parameter via commandline to specify if you want data 
-normalized or standardized
-- created training loop
+## Run Locally:
 
-July 19th:
-- added feature scaling
-    * scaling_func() function to return either normalize function or standardize function
-        - both funcs returns respective scaled np arrays
-    * added another parameter in command line to specify normlization or standardization
-- added softmax
-- new command line parameter to specify output layer activation function
-- new command line parameter to specify batch size
-- training loop in main()
-    - shuffling data using dataloader
+### 1. **Clone the repo**
+   ```bash
+   git clone [https://github.com/twaltner251/Dynamic-MLP.git](https://github.com/twaltner251/Dynamic-MLP.git)
+   cd Dynamic-MLP
+   ```
+
+### 2. **Run the model via command line specifying parameters**
+    ```bash
+    python3 main.py <dataset> <hidden_layers...> <num_classes> <hidden_activ> <out_activ> <loss_func> <epochs> <learning_rate> <scaling>
+    ```
+    
+### Parameter Breakdown:
+
+- **dataset**: Path to dataset (e.g., `data/fashion`).
+- **hidden layers**: Space-separated node counts (e.g., `128 16`).
+- **num classes**: Number of output classifications (e.g., `10`).
+- **activation funcs**:
+    - `sig` or `sigmoid`: Sigmoid
+    - `relu`: ReLU
+    - `leaky_relu`: Leaky ReLU
+    - `smax`: Softmax
+    - `tanh`: Tanh
+- **loss func**:
+    - `mse`: Mean Squared Error
+    - `bce`: Binary Cross Entropy
+    - `fl`: Focal Loss
+- **epochs**: Integer (e.g., `100`).
+- **learning rate**: Float (e.g., `0.1`).
+- **scaling**:
+    - `norm`: Normalization
+    - `std`: Standardization
+
+### 3. **Interactive Prompts:**
+* **Loading:** It will ask: "Would you like to load from an previous save? Please enter either "y" for yes or "n" for no:". If you select "y", you will need to provide the filepath to a valid .npz file.  
+* **Saving:** After the training loop finishes, it will ask: "Would you like to save model? Please enter either "y" for yes or "n" for no:". If you select "y", simply type the desired file name (e.g., my_model), and it will save as an .npz file in your current directory.  
+
+## 📚 Acknowledgements & References
+
+* **3Blue1Brown**: A special shoutout to the phenomenal [Deep Learning YouTube series](https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi). Having visual explanations to these complex topics helped me wrap my head around them better and led to a deeper, intuitive understanding of the linear algebra and calculus driving backpropagation.

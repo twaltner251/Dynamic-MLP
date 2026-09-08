@@ -455,11 +455,14 @@ def main():
         # instantiate model
         model = MLP(layers, actv_funcs, outer_funcs, loss_funcs, batch_size, False)
 
-    macro_f1 = 0
     # training loop
     for e in range(epochs):
         # shuffle idx array in-place with np.random.shuffle() each epoch
         np.random.shuffle(idx)
+
+        # arrays to track y's and y_hat so far of epochs to track f1 score
+        y_so_far = []
+        y_hat_so_far = []
 
         # iterates thru entire dataset using interval batch_size
         for b in range(0, len(X_train), batch_size):
@@ -470,7 +473,10 @@ def main():
             # construct x & y arrays of batch
             for k in batch_idx:
                 x.append(X_train[k])
-                y.append(y_train[k])        
+                y.append(y_train[k])
+                
+            # append y_so_far tracker array
+            y_so_far.extend(y)        
             
             # convert inputs to np array
             x_np = np.array(x)
@@ -480,6 +486,9 @@ def main():
 
             # compress each of the output activations into one guess (most activated node) returns array of ints length num_classes
             y_hat_guesses = deconstruct_label_array(y_hat) 
+
+            # append y_hat_so_far tracker array
+            y_hat_so_far.extend(y_hat_guesses)
 
             # construct correct label array for batch
             y_array = construct_label_array(y, num_classes)
@@ -493,13 +502,14 @@ def main():
             # calculate loss
             loss = loss_funcs[0](y_array, y_hat)
 
-            print(f'Epoch: {e + 1:03}, Batch: {b // batch_size + 1:03}, Loss: {loss:.4f}, Macro F1: {macro_f1:.4f}, Batch Success: {success}')
-
-        # calculate F1
-        macro_f1 = macro_f_score(y, y_hat_guesses, num_classes)
-
+            print(f'Epoch: {e + 1:03}, Batch: {b // batch_size + 1:03}, Loss: {loss:.4f}, Batch Success: {success}')
         
+        # calculate F1
+        macro_f1 = macro_f_score(y_so_far, y_hat_so_far, num_classes)
 
+        # end of epoch print stmt
+        print(f'[!][!] END OF EPOCH {e + 1:03}, Macro F1 Score: {macro_f1:.4f} [!][!]') 
+    
 
     # save model after training loop
     save = ''
