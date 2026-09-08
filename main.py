@@ -466,4 +466,33 @@ def main():
             print(f'Epoch: {e + 1:03}, Batch: {b // batch_size + 1:03}, Loss: {loss:.4f}, Macro F1: {macro_f1:.4f}, Batch Success: {success}')
 
 
+    # save model after training loop
+    save = ''
+    while save.lower() not in ['y', 'n']:
+        save = input('Model has finished running.\nWould you like to save model? Please enter either "y" for yes or "n" for no: ')
+    
+    if save.lower() == 'y': 
+        # if saving handle retrieving name of txt file
+        name = ''
+
+        while True:
+            name = input('Please enter name of file to save model to. Filetype does not need to be specified, just the filename.\nExample Input: "nameOfFile": ')
+            
+            if len(name) >= 1 and name[-4:] != '.npz' and name[-4:] != '.txt':
+                break
+        
+        # store all weights and biases of model into dictionary
+        model_wb = {"layers": layers}
+        
+        idx = 0
+
+        for w, b in zip(model.weights, model.biases):
+            model_wb[f'layer_{idx}_weights'] = w
+            model_wb[f'layer_{idx}_biases'] = b
+            idx += 1
+        
+        np.savez(name, model_wb)
+        print(f'Model successfuly saved to {name}.npz')
+
+
 main()
