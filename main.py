@@ -455,8 +455,6 @@ def main():
         # instantiate model
         model = MLP(layers, actv_funcs, outer_funcs, loss_funcs, batch_size, False)
 
-    return
-
     # training loop
     for e in range(epochs):
         # shuffle idx array in-place with np.random.shuffle() each epoch
