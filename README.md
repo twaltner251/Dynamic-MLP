@@ -8,7 +8,7 @@
 
 ## Project Overview:
 
-A fully custom, from-scratch Multi-Layer Perceptron (MLP) engineered in Python and NumPy to classify the FashionMNIST dataset.
+A Dynamic Multi-Layer Perceptron (MLP) structured via CLI by user, engineered by using Python and NumPy to classify the FashionMNIST dataset.
 
 Sparked by my Intro to AI course (CSC 242) in Spring 2026, my curiosity for neural networks drove me to look under the hood. Rather than relying on the abstractions of high-level frameworks like PyTorch or TensorFlow, I chose to build this model using minimal external dependencies. This hands-on approach allowed me to deeply absorb the underlying concepts, prioritizing low-level memory optimization, algorithmic efficiency, and a first-hand mathematical implementation of core deep learning mechanics.
 
