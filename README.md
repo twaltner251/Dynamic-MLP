@@ -1,7 +1,7 @@
 #### Date: September 8th, 2026
 #### Contact: waltnertyler@gmail.com | twaltner@u.rochester.edu
 
-# Dynamic Minibatch MLP from Scratch!
+# Dynamic CLI Minibatch MLP implemented from Scratch
 
 ## Demo: 🎆
 <img src="demo.gif" alt="Demo GIF" width="800">
@@ -53,9 +53,7 @@ Sparked by my Intro to AI course (CSC 242) in Spring 2026, my curiosity for neur
    ```
 
 ### 2. **Run the model via command line specifying parameters**
-    ```bash
     python3 main.py <dataset> <hidden_layers...> <num_classes> <hidden_activ> <out_activ> <loss_func> <epochs> <learning_rate> <scaling>
-    ```
     
 ### Parameter Breakdown:
 
