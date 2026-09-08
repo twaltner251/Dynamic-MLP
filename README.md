@@ -39,7 +39,7 @@ $$\frac{\partial C}{\partial w} = \frac{\partial C}{\partial b} \cdot a_{prev}$$
 
 ## 🚀 Instructions for Use
 
-Run the model via the command line by specifying your desired hyperparameters:
+Run the model via the command line by specifying your desired parameters:
 
 ```bash
 # Syntax:
