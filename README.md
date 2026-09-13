@@ -1,4 +1,4 @@
-#### Date: September 8th, 2026
+#### Date: September 13th, 2026
 #### Contact: waltnertyler@gmail.com | twaltner@u.rochester.edu
 
 # Dynamic CLI Minibatch MLP implemented from Scratch
