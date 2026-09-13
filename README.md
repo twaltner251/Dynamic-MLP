@@ -29,6 +29,7 @@ Sparked by my Intro to AI course (CSC 242) in Spring 2026, my curiosity for neur
 **Algorithmic & Mathematical Implementation**
 
 * **Manual Backpropagation:** Wrote the forward and backward passes completely from scratch using raw NumPy matrix multiplication, manually applying chain-rule calculus and gradient descent.
+* **He Initialization**: Had problem of exploding gradients when utilizing relu, to improve training stability, implemented He initialization of weights, adjusting the variance of weights based on the number of input neurons.
 * **Optimized Calculus:** Streamlined backpropagation by computing the bias gradient ($\frac{\partial C}{\partial b}$) first, then reusing it to efficiently find the weight gradient ($\frac{\partial C}{\partial w}$) to avoid redundant math.
 * **Pure Vectorization:** Stripped out slow Python for-loops and replaced them with pure NumPy vectorization for calculating activation derivatives and Macro F1 scores, noticeably boosting execution speed.
 * **Reusable Skeleton:** Built the project to be highly adaptable; because of the dynamic hidden layers and configurable parameters, this architecture can be easily repurposed for classification tasks way beyond just fashionMNIST.
@@ -79,6 +80,11 @@ Sparked by my Intro to AI course (CSC 242) in Spring 2026, my curiosity for neur
 ### 3. **Interactive Prompts:**
 * **Loading:** It will ask: "Would you like to load from an previous save? Please enter either "y" for yes or "n" for no:". If you select "y", you will need to provide the filepath to a valid .npz file.  
 * **Saving:** After the training loop finishes, it will ask: "Would you like to save model? Please enter either "y" for yes or "n" for no:". If you select "y", simply type the desired file name (e.g., my_model), and it will save as an .npz file in your current directory.  
+
+## Future Features:
+* Train / Test parameter via CLI instead of manual changing of to testing dataset.
+* L2 Regularlization?
+* Validation sets for adjusting hyperameters.
 
 ## 📚 Acknowledgements & References
 
